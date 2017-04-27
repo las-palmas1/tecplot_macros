@@ -4,6 +4,9 @@ import pandas as pd
 import copy
 import enum
 import numpy as np
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(msg)s')
 
 
 class Point:
@@ -44,15 +47,45 @@ def _get_extract_from_polyline_command(polyline: PolyLine,
     return result
 
 
-def get_open_data_file_command(filename: str):
+class LoaderType(enum.Enum):
+    TECPLOT = 0
+    CFX = 1
+
+
+def get_open_data_file_command(filename: str, loader_type: LoaderType = LoaderType.TECPLOT):
     """
     Фукция возвращает строку, содержащую набор команд на скриптовом языке TecPlot для 
-    открытия файла с расширением .plt\n
+    открытия файла с расширением .plt или .res\n
     :param filename: str \n 
         Путь к файлу с расширенем .plt
+    :param loader_type: LoaderType \n
+        Тип загрузчика данных
     :return: str \n 
     """
     result = "$!READDATASET  '%s'\n" % filename
+    if loader_type == LoaderType.CFX:
+        result = "$!READDATASET  '%s%s%s %s%s%s %s%s%s %s%s%s %s%s%s %s%s%s %s%s%s %s%s%s' " \
+                 "DATASETREADER = 'ANSYS CFX (FEA)'\n" % ('"', 'StandardSyntax', '"', '"', '1.0', '"', '"',
+                                                          'FEALoaderVersion', '"', '"', '435', '"', '"',
+                                                          'FILENAME_File', '"', '"', filename, '"', '"',
+                                                          'AutoAssignStrandIDs', '"', '"', 'Yes', '"')
+    return result
+
+
+def get_write_data_set_command(filename: str) -> str:
+    """
+    :param filename: str \n
+        имя файла с расширением .plt, в который будут сохранены данные
+    :return: str \n
+    """
+    result = "$!WRITEDATASET  '%s' \n" \
+             "  INCLUDETEXT = NO\n" \
+             "  INCLUDEGEOM = NO\n" \
+             "  INCLUDEDATASHARELINKAGE = YES\n" \
+             "  BINARY = YES\n" \
+             "  USEPOINTFORMAT = NO\n" \
+             "  PRECISION = 9\n" \
+             "  TECPLOTVERSIONTOWRITE = TECPLOTCURRENT\n" % (filename)
     return result
 
 
@@ -151,7 +184,7 @@ class LineDataLoader:
     """
     Позволяет считать извлеченные по полилиниям данные  из всех файлов, содержащихся в папке, путь к которой 
     хранится в поле data_dirname, и записать данные из каждого файла в экземпляр класса Pandas.DataFrame, доступ к 
-    списку которых осуществляется через поле frame
+    списку которых осуществляется через поле frames
     """
     def __init__(self, data_dirname: str):
         """
@@ -232,6 +265,7 @@ class LineDataLoader:
     def load(self):
         files_list = os.listdir(self.data_dirname)
         for filename in files_list:
+            logging.info('%s:   Loading file:   %s' % (LineDataLoader.__name__, filename))
             str_list = self._get_str_list_from_file(os.path.join(self.data_dirname, filename))
             var_names = self._get_variable_names(str_list)
             var_arrays = self._get_variable_arrays(str_list)
@@ -712,11 +746,11 @@ def _get_create_picture_macro(axis_settings: AxisSettings, export_settings: Expo
 
 
 class PictureCreator:
-    def __init__(self, file_for_pictures: str, macro_filename: str, slice_settings: SliceSettings,
+    def __init__(self, source_file: str, macro_filename: str, slice_settings: SliceSettings,
                  level_settings: LevelSettings, legend_settings: LegendSettings, colormap_settings: ColormapSettings,
                  axis_settings: AxisSettings, export_settings: ExportSettings, frame_settings: FrameSettings):
         """
-        :param file_for_pictures: str \n
+        :param source_file: str \n
             Имя файла с расширением .plt или .lay, содержащий данные для визуализации
         :param macro_filename: tr \n
             Имя файла, в который будет сохранен макрос
@@ -728,7 +762,7 @@ class PictureCreator:
         :param export_settings: ExportSettings \n
         :param frame_settings: FrameSettings \n
         """
-        self.file_for_pictures = file_for_pictures
+        self.source_file = source_file
         self.macro_filename = macro_filename
         self.slice_settings = slice_settings
         self.level_settings = level_settings
@@ -761,10 +795,10 @@ class PictureCreator:
         return _get_legend_font_settings(self.legend_settings.header_font, self.legend_settings.number_font)
 
     def run_creation(self):
-        if os.path.splitext(self.file_for_pictures)[1] == '.plt':
-            open_file = get_open_data_file_command(self.file_for_pictures)
+        if os.path.splitext(self.source_file)[1] == '.plt':
+            open_file = get_open_data_file_command(self.source_file)
         else:
-            open_file = get_open_layout_command(self.file_for_pictures)
+            open_file = get_open_layout_command(self.source_file)
         slice_settings = self._get_slice_settings_macro()
         level_settings = self._get_level_settings_macro()
         legend_settings = self._get_legend_settings_macro()
@@ -790,3 +824,4 @@ if __name__ == '__main__':
     #                              slice_settings, levels_settings, legend_settings, colormap_settings,
     #                              axis_settings, export_settings)
     # pic_creator.run_creation()
+
