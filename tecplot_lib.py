@@ -6,6 +6,9 @@ import enum
 import numpy as np
 import logging
 
+__version__ = '0.1'
+__author__ = 'Alexander Zhigalkin'
+
 logging.basicConfig(level=logging.INFO, format='%(msg)s')
 
 
@@ -23,6 +26,11 @@ class PolyLine:
 
 
 def wrap_macro(macro_body: str) -> str:
+    """
+    Добавляет обязательные команды к конек и начало макроса
+    :param macro_body: str
+    :return: str
+    """
     result = "#!MC 1410\n" \
              "$!VarSet |MFBD| = 'C:\Program Files\Tecplot\Tecplot 360 EX 2016 R2'\n" \
              "%s"\
@@ -55,7 +63,7 @@ class LoaderType(enum.Enum):
 def get_open_data_file_command(filename: str, loader_type: LoaderType = LoaderType.TECPLOT):
     """
     Фукция возвращает строку, содержащую набор команд на скриптовом языке TecPlot для 
-    открытия файла с расширением .plt или .res\n
+    открытия файла с расширением .plt или .res \n
     :param filename: str \n 
         Путь к файлу с расширенем .plt
     :param loader_type: LoaderType \n
@@ -104,7 +112,7 @@ def get_open_layout_command(filename: str) -> str:
 def get_save_layout_command(filename: str) -> str:
     """
     Фукция возвращает строку, содержащую набор команд на скриптовом языке TecPlot для 
-    сохранения файла с расширением .lay или .plt\n
+    сохранения файла с расширением .lay или .plt \n
     :param filename: str \n 
         Путь к файлу с расширенем .lay
     :return: str \n 
@@ -154,7 +162,8 @@ class LineDataExtractor:
         :param output_dir: str \n
             Имя директории для извлеченных данных
         :param polylines_list: List[List[PolyLine]] \n
-            список полилиний, по которым будут извелкаться данные
+            список списков полилиний, по которым будут извелкаться данные; каждый список из данного списка 
+            соответствует набору полилиний для каждого файла с данными из папки datafiles_dir
         :param macro_name: str \n
             имя макроса, под которым он будет сохранен
         """
