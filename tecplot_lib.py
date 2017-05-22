@@ -482,6 +482,59 @@ def _get_levels_setting_macro(variable_number: int, min_level, max_level,
     return result
 
 
+def get_ticks_settings_macro(x_auto_grid: bool = True, x_major_thickness: float =0.5, x_major_length: float = 2,
+                             x_minor_thickness: float =0.12, x_minor_length: float = 1.2,
+                             y_auto_grid: bool = True, y_major_thickness: float =0.5, y_major_length: float = 2.,
+                             y_minor_thickness: float =0.12, y_minor_length: float = 1.2,
+                             **kwargs):
+    """
+    :param x_auto_grid: bool, optional \n
+        Параметр регулирует автонастройку сетки на оси x
+    :param x_major_thickness:  float, optional \n
+        Толщина основных меток на оси x
+    :param x_major_length: float, optional \n
+        Длина основных меток на оси x
+    :param x_minor_thickness: float, optional \n
+        Толщина второстепенных меток на оси x \n
+    :param x_minor_length: float, optional \n
+        Длина второстепенных меток по оси x
+    :param y_auto_grid: bool, optional  \n
+    :param y_major_thickness: float, optional  \n 
+    :param y_major_length: float, optional  \n
+    :param y_minor_thickness: float, optional  \n
+    :param y_minor_length: float, optional  \n
+    :param kwargs: \n
+        x_spacing - float; шаг по оси x, необходимо задавать, если x_auto_grid == False \n
+        y_spacing - float; шаг по оси y, необходимо задавать, если y_auto_grid == False \n
+        x_minor_num_ticks - int; количество второстепенных меток между основными на оси x, необходимо задавать, 
+        если x_auto_grid == False \n
+        y_minor_num_ticks - int; количество второстепенных меток между основными на оси y, необходимо задавать, 
+        если y_auto_grid == False \n
+    :return: str
+    """
+    result = "$!TWODAXIS XDETAIL{AUTOGRID = %s}\n"  \
+             "$!TWODAXIS XDETAIL{TICKS{LENGTH = %s}}\n" \
+             "$!TWODAXIS XDETAIL{TICKS{LINETHICKNESS = %s}}\n" \
+             "$!TWODAXIS XDETAIL{TICKS{MINORLENGTH = %s}}\n" \
+             "$!TWODAXIS XDETAIL{TICKS{MINORLINETHICKNESS = %s}}\n" \
+             "$!TWODAXIS YDETAIL{AUTOGRID = %s}\n" \
+             "$!TWODAXIS YDETAIL{TICKS{LENGTH = %s}}\n" \
+             "$!TWODAXIS YDETAIL{TICKS{LINETHICKNESS = %s}}\n" \
+             "$!TWODAXIS YDETAIL{TICKS{MINORLENGTH = %s}}\n" \
+             "$!TWODAXIS YDETAIL{TICKS{MINORLINETHICKNESS = %s}}\n" % (x_auto_grid.__str__().upper(), x_major_length,
+                                                                       x_major_thickness, x_minor_length,
+                                                                       x_minor_thickness, y_auto_grid.__str__().upper(),
+                                                                       y_major_length, y_major_thickness,
+                                                                       y_minor_length, y_minor_thickness)
+    if not x_auto_grid and 'x_spacing' in kwargs and 'x_minor_num_ticks' in kwargs:
+        result += "$!TWODAXIS XDETAIL{GRSPACING = %s}\n" \
+                  "$!TWODAXIS XDETAIL{TICKS{NUMMINORTICKS = %s}}\n" % (kwargs['x_spacing'], kwargs['x_minor_num_ticks'])
+    if not y_auto_grid and 'y_spacing' in kwargs and 'y_minor_num_ticks' in kwargs:
+        result += "$!TWODAXIS YDETAIL{GRSPACING = %s}\n" \
+                  "$!TWODAXIS YDETAIL{TICKS{NUMMINORTICKS = %s}}\n" % (kwargs['y_spacing'], kwargs['y_minor_num_ticks'])
+    return result
+
+
 def _get_legend_settings_macro(xy_position: tuple = (95, 80), rowspacing: float = 1.2, auto_levelskip: int = 1,
                                isvertical: bool = True) -> str:
     if isvertical:
@@ -742,8 +795,50 @@ class ExportSettings:
         self.imagewidth = imagewidth
 
 
-def _get_create_picture_macro(axis_settings: AxisSettings, export_settings: ExportSettings,
-                              frame_settings: FrameSettings) -> str:
+class TicksSettings:
+    def __init__(self, x_auto_grid: bool = True, x_major_thickness: float =0.5, x_major_length: float = 2,
+                 x_minor_thickness: float =0.12, x_minor_length: float = 1.2,
+                 y_auto_grid: bool = True, y_major_thickness: float =0.5, y_major_length: float = 2.,
+                 y_minor_thickness: float =0.12, y_minor_length: float = 1.2, **kwargs):
+        """
+        :param x_auto_grid: bool, optional \n
+            Параметр регулирует автонастройку сетки на оси x
+        :param x_major_thickness:  float, optional \n
+            Толщина основных меток на оси x
+        :param x_major_length: float, optional \n
+            Длина основных меток на оси x
+        :param x_minor_thickness: float, optional \n
+            Толщина второстепенных меток на оси x \n
+        :param x_minor_length: float, optional \n
+            Длина второстепенных меток по оси x
+        :param y_auto_grid: bool, optional  \n
+        :param y_major_thickness: float, optional  \n 
+        :param y_major_length: float, optional  \n
+        :param y_minor_thickness: float, optional  \n
+        :param y_minor_length: float, optional  \n
+        :param kwargs: \n
+            x_spacing - float; шаг по оси x, необходимо задавать, если x_auto_grid == False \n
+            y_spacing - float; шаг по оси y, необходимо задавать, если y_auto_grid == False \n
+            x_minor_num_ticks - int; количество второстепенных меток между основными на оси x, необходимо задавать, 
+            если x_auto_grid == False \n
+            y_minor_num_ticks - int; количество второстепенных меток между основными на оси y, необходимо задавать, 
+            если y_auto_grid == False \n
+        """
+        self.x_auto_grid = x_auto_grid
+        self.x_major_thickness = x_major_thickness
+        self.x_major_length = x_major_length
+        self.x_minor_thickness = x_minor_thickness
+        self.x_minor_length = x_minor_length
+        self.y_auto_grid = y_auto_grid
+        self.y_major_thickness = y_major_thickness
+        self.y_major_length = y_major_length
+        self.y_minor_thickness = y_minor_thickness
+        self.y_minor_length = y_minor_length
+        self.kwargs = kwargs
+
+
+def _get_create_picture_macro(axis_settings: AxisSettings, ticks_settings: TicksSettings,
+                              export_settings: ExportSettings, frame_settings: FrameSettings) -> str:
 
     extract_slice = _get_extract_slice_command()
     show_contour = _get_show_contour_command()
@@ -754,20 +849,27 @@ def _get_create_picture_macro(axis_settings: AxisSettings, export_settings: Expo
                                                  axis_settings.x_title_offset, axis_settings.x_label_offset,
                                                  axis_settings.y_title_font, axis_settings.y_label_font,
                                                  axis_settings.y_title_offset, axis_settings.y_label_offset)
+    ticks_settings_macro = get_ticks_settings_macro(ticks_settings.x_auto_grid, ticks_settings.x_major_thickness,
+                                                    ticks_settings.x_major_length, ticks_settings.x_minor_thickness,
+                                                    ticks_settings.x_minor_length,
+                                                    ticks_settings.y_auto_grid, ticks_settings.y_major_thickness,
+                                                    ticks_settings.y_major_length, ticks_settings.y_minor_thickness,
+                                                    ticks_settings.y_minor_length, **ticks_settings.kwargs)
     activate_zone = _get_activate_zones_command([export_settings.zone_number])
     frame_size = _get_frame_size_commands(frame_settings.width, frame_settings.height)
     export = _get_export_command(export_settings.exportfname, export_settings.imagewidth)
     delete_zone = _get_delete_zones_command([export_settings.zone_number])
     go_to_3d = _get_go_to_3d_command()
-    result = extract_slice + show_contour + go_to_2d + axis_font_settings + activate_zone + frame_size + export + \
-             delete_zone + go_to_3d
+    result = (extract_slice + show_contour + go_to_2d + axis_font_settings + ticks_settings_macro + activate_zone +
+              frame_size + export + delete_zone + go_to_3d)
     return result
 
 
 class PictureCreator:
     def __init__(self, source_file: str, macro_filename: str, slice_settings: SliceSettings,
                  level_settings: LevelSettings, legend_settings: LegendSettings, colormap_settings: ColormapSettings,
-                 axis_settings: AxisSettings, export_settings: ExportSettings, frame_settings: FrameSettings):
+                 axis_settings: AxisSettings, ticks_settings: TicksSettings, export_settings: ExportSettings,
+                 frame_settings: FrameSettings):
         """
         :param source_file: str \n
             Имя файла с расширением .plt или .lay, содержащий данные для визуализации
@@ -778,6 +880,7 @@ class PictureCreator:
         :param legend_settings: LegendSettings \n
         :param colormap_settings: ColorMap \n
         :param axis_settings: AxisSettings \n
+        :param ticks_settings: TicksSettings \n
         :param export_settings: ExportSettings \n
         :param frame_settings: FrameSettings \n
         """
@@ -788,6 +891,7 @@ class PictureCreator:
         self.legend_settings = legend_settings
         self.colormap_settings = colormap_settings
         self.axis_settings = axis_settings
+        self.ticks_settings = ticks_settings
         self.export_settings = export_settings
         self.frame_settings = frame_settings
 
@@ -808,7 +912,7 @@ class PictureCreator:
                                             self.colormap_settings.colormap_name, **self.colormap_settings.kwargs)
 
     def _get_create_picture_macro(self):
-        return _get_create_picture_macro(self.axis_settings, self.export_settings, self.frame_settings)
+        return _get_create_picture_macro(self.axis_settings, self.ticks_settings, self.export_settings, self.frame_settings)
 
     def _get_legend_font_settings(self):
         return _get_legend_font_settings(self.legend_settings.header_font, self.legend_settings.number_font)
