@@ -432,7 +432,8 @@ def _get_legend_font_settings(header_font: Font = Font(), number_font: Font = Fo
 
 
 def _get_axis_font_settings(x_title_font: Font = Font(), x_label_font: Font = Font(), x_title_offset=5.,
-                            y_title_font: Font = Font(), y_label_font: Font = Font(), y_title_offset=5.) -> str:
+                            x_label_offset=1., y_title_font: Font = Font(), y_label_font: Font = Font(),
+                            y_title_offset=5., y_label_offset=1.) -> str:
     x_title = "$!TWODAXIS XDETAIL{TITLE{TEXTSHAPE{FONTFAMILY = '%s'}}}\n" \
               "$!TWODAXIS XDETAIL{TITLE{TEXTSHAPE{HEIGHT =%s}}}\n" \
               "$!TWODAXIS XDETAIL{TITLE{TEXTSHAPE{ISITALIC = %s}}}\n" \
@@ -443,9 +444,10 @@ def _get_axis_font_settings(x_title_font: Font = Font(), x_label_font: Font = Fo
     x_label = "$!TWODAXIS XDETAIL{TICKLABEL{TEXTSHAPE{FONTFAMILY = '%s'}}}\n" \
               "$!TWODAXIS XDETAIL{TICKLABEL{TEXTSHAPE{HEIGHT =%s}}}\n" \
               "$!TWODAXIS XDETAIL{TICKLABEL{TEXTSHAPE{ISITALIC = %s}}}\n" \
-              "$!TWODAXIS XDETAIL{TICKLABEL{TEXTSHAPE{ISBOLD = %s}}}\n" % (x_label_font.font_family,
+              "$!TWODAXIS XDETAIL{TICKLABEL{TEXTSHAPE{ISBOLD = %s}}}\n" \
+              "$!TWODAXIS XDETAIL{TICKLABEL{OFFSET = %s}}\n" % (x_label_font.font_family,
                                                                            x_label_font.height, x_label_font.is_italic,
-                                                                           x_label_font.is_bold)
+                                                                           x_label_font.is_bold, x_label_offset)
     y_title = "$!TWODAXIS YDETAIL{TITLE{TEXTSHAPE{FONTFAMILY = '%s'}}}\n" \
               "$!TWODAXIS YDETAIL{TITLE{TEXTSHAPE{HEIGHT =%s}}}\n" \
               "$!TWODAXIS YDETAIL{TITLE{TEXTSHAPE{ISITALIC = %s}}}\n" \
@@ -456,9 +458,10 @@ def _get_axis_font_settings(x_title_font: Font = Font(), x_label_font: Font = Fo
     y_label = "$!TWODAXIS YDETAIL{TICKLABEL{TEXTSHAPE{FONTFAMILY = '%s'}}}\n" \
               "$!TWODAXIS YDETAIL{TICKLABEL{TEXTSHAPE{HEIGHT =%s}}}\n" \
               "$!TWODAXIS YDETAIL{TICKLABEL{TEXTSHAPE{ISITALIC = %s}}}\n" \
-              "$!TWODAXIS YDETAIL{TICKLABEL{TEXTSHAPE{ISBOLD = %s}}}\n" % (y_label_font.font_family,
+              "$!TWODAXIS YDETAIL{TICKLABEL{TEXTSHAPE{ISBOLD = %s}}}\n" \
+              "$!TWODAXIS YDETAIL{TICKLABEL{OFFSET = %s}}\n" % (y_label_font.font_family,
                                                                            y_label_font.height, y_label_font.is_italic,
-                                                                           y_label_font.is_bold)
+                                                                           y_label_font.is_bold, y_label_offset)
     result = x_title + x_label + y_title + y_label
     return result
 
@@ -672,8 +675,8 @@ class AxisSettings:
     def __init__(self, x_axis_var: int, y_axis_var: int, rect: tuple = (10, 10, 90, 90), x_line_pos: float=0,
                  y_line_pos: float=0, preserve_axis_length: bool = False,
                  x_title_font: Font = Font(), x_label_font: Font = Font(), x_title_offset: float=5.,
-                 y_title_font: Font = Font(), y_label_font: Font = Font(), y_title_offset: float=5.,
-                 **kwargs):
+                 x_label_offset: float = 1., y_title_font: Font = Font(), y_label_font: Font = Font(),
+                 y_title_offset: float=5., y_label_offset: float = 1., **kwargs):
         """
         :param x_axis_var: int \n
             номер переменной, откладываемая по горизонтальной оси, например, x_axis_var = 0
@@ -694,12 +697,16 @@ class AxisSettings:
             экземпляр класса Font, содержащий настройки шрифта для лэйблов оси x
         :param x_title_offset: float, optional \n
             сдвиг заголовка оси x относсительно оси
+        :param x_label_offset: float, optional \n
+            оступ подписей оси x от оси
         :param y_title_font: Font, optional \n
             экземпляр класса Font, содержащий настройки шрифта для заголовка оси y
         :param y_label_font: Font, optional \n
             экземпляр класса Font, содержащий настройки шрифта для лэйблов оси y
         :param y_title_offset: int, optional \n
             сдвиг заголовка оси y относсительно оси
+        :param y_label_offset: float, optional \n
+            оступ подписей оси y от оси
         :param kwargs: xlim и ylim (интервалы по осям x и y соотвественно), тип tuple; пример: xlim=(0,1), ylim=(1,2)
         """
         self.x_axis_var = x_axis_var
@@ -711,9 +718,11 @@ class AxisSettings:
         self.x_title_font = x_title_font
         self.x_label_font = x_label_font
         self.x_title_offset = x_title_offset
+        self.x_label_offset = x_label_offset
         self.y_title_font = y_title_font
         self.y_label_font = y_label_font
         self.y_title_offset = y_title_offset
+        self.y_label_offset = y_label_offset
         self.kwargs = kwargs
 
 
@@ -742,8 +751,9 @@ def _get_create_picture_macro(axis_settings: AxisSettings, export_settings: Expo
                                    axis_settings.y_line_pos, axis_settings.rect,
                                    axis_settings.preserve_axis_scale, **axis_settings.kwargs)
     axis_font_settings = _get_axis_font_settings(axis_settings.x_title_font, axis_settings.x_label_font,
-                                                 axis_settings.x_title_offset, axis_settings.y_title_font,
-                                                 axis_settings.y_label_font, axis_settings.y_title_offset)
+                                                 axis_settings.x_title_offset, axis_settings.x_label_offset,
+                                                 axis_settings.y_title_font, axis_settings.y_label_font,
+                                                 axis_settings.y_title_offset, axis_settings.y_label_offset)
     activate_zone = _get_activate_zones_command([export_settings.zone_number])
     frame_size = _get_frame_size_commands(frame_settings.width, frame_settings.height)
     export = _get_export_command(export_settings.exportfname, export_settings.imagewidth)
