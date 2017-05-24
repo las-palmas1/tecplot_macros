@@ -375,7 +375,9 @@ def _get_go_to_2d_macro(x_axis_var: int, y_axis_var: int, x_line_pos: float=0., 
               "      Y2 = %s\n" \
               "    }\n" \
               "  }\n" \
+              "$!TWODAXIS XDETAIL{AXISLINE{AXISALIGNMENT = WITHVIEWPORT}}\n" \
               "$!TWODAXIS XDETAIL{AXISLINE{POSITION = %s}}\n" \
+              "$!TWODAXIS YDETAIL{AXISLINE{AXISALIGNMENT = WITHVIEWPORT}}\n" \
               "$!TWODAXIS YDETAIL{AXISLINE{POSITION = %s}}\n" % (rect[0], rect[1], rect[2], rect[3],
                                                                  x_line_pos, y_line_pos)
     if 'xlim' in kwargs and 'ylim' in kwargs:
