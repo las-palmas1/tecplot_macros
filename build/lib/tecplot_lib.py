@@ -6,7 +6,7 @@ import enum
 import numpy as np
 import logging
 
-__version__ = '0.1'
+__version__ = '0.2'
 __author__ = 'Alexander Zhigalkin'
 
 logging.basicConfig(level=logging.INFO, format='%(msg)s')
@@ -35,7 +35,7 @@ def wrap_macro(macro_body: str) -> str:
              "$!VarSet |MFBD| = 'C:\Program Files\Tecplot\Tecplot 360 EX 2016 R2'\n" \
              "%s"\
              "$!RemoveVar |MFBD|\n" \
-             "$!Quit" % macro_body
+             "$!Quit\n" % macro_body
     return result
 
 
@@ -914,12 +914,74 @@ class PictureCreator:
                                             self.colormap_settings.colormap_name, **self.colormap_settings.kwargs)
 
     def _get_create_picture_macro(self):
-        return _get_create_picture_macro(self.axis_settings, self.ticks_settings, self.export_settings, self.frame_settings)
+        return _get_create_picture_macro(self.axis_settings, self.ticks_settings, self.export_settings,
+                                         self.frame_settings)
 
     def _get_legend_font_settings(self):
         return _get_legend_font_settings(self.legend_settings.header_font, self.legend_settings.number_font)
 
     def run_creation(self):
+        """
+        Запускает файл макроса. Если файл пуст или его не существует, создает файл макроса, записывает в
+        него команды и запускает.
+
+        :return: None
+        """
+        self._check_macro_existence(self.macro_filename)
+        if self._is_wrapped(self.macro_filename):
+            self._clear_macro(self.macro_filename)
+        with open(self.macro_filename, 'r') as file:
+            content = file.read()
+        if content.__len__() == 0:
+            self.add_to_existing_macro()
+        with open(self.macro_filename, 'r') as file:
+            content = file.read()
+        create_macro_file(wrap_macro(content), self.macro_filename)
+        execute_macro(self.macro_filename)
+
+    @classmethod
+    def _add_string_to_file(cls, filename: str, string_to_add: str):
+        with open(filename, 'r') as file:
+            content = file.read()
+        with open(filename, 'w') as file:
+            file.write(content + string_to_add)
+
+    @classmethod
+    def _check_macro_existence(cls, macro_filename: str):
+        try:
+            file = open(macro_filename, 'r')
+            file.close()
+        except FileNotFoundError:
+            file = open(macro_filename, 'w')
+            file.close()
+
+    @classmethod
+    def _is_wrapped(cls, macro_filename) -> bool:
+        with open(macro_filename, 'r') as file:
+            content = file.read()
+        if content.__len__() != 0:
+            if content[len(content)-5: len(content)-1] == 'Quit':
+                return True
+            else:
+                return False
+        else:
+            return False
+
+    @classmethod
+    def _clear_macro(cls, macro_filename: str):
+        file = open(macro_filename, 'w')
+        file.close()
+
+    def add_to_existing_macro(self):
+        """
+        Добавляет команды в существующий макрос. Если файла с макросом не существует, создает пустой файл
+        и записывает в него команды.
+
+        :return: None
+        """
+        self._check_macro_existence(self.macro_filename)
+        if self._is_wrapped(self.macro_filename):
+            self._clear_macro(self.macro_filename)
         if os.path.splitext(self.source_file)[1] == '.plt':
             open_file = get_open_data_file_command(self.source_file)
         else:
@@ -930,23 +992,11 @@ class PictureCreator:
         legend_font_setting = self._get_legend_font_settings()
         colormap_settings = self._get_colormap_settings_macro()
         create_picture = self._get_create_picture_macro()
-        macro = wrap_macro(open_file + slice_settings + level_settings + legend_settings + legend_font_setting +
-                           colormap_settings + create_picture)
-        create_macro_file(macro, self.macro_filename)
-        execute_macro(self.macro_filename)
+        self._add_string_to_file(self.macro_filename, open_file + slice_settings + level_settings + legend_settings +
+                                 legend_font_setting + colormap_settings + create_picture)
 
 
 if __name__ == '__main__':
     pass
-    # slice_settings = SliceSettings(SliceType.ARBITRARY, (0.1, 0.15, 0.1), normal=(0, 1, 0))
-    # legend_settings = LegendSettings(xy_position=(90, 45))
-    # levels_settings = LevelSettings(5, 0, 90, 10)
-    # colormap_settings = ColormapSettings(ColorDistribution.BANDED, ColorMap.MODERN)
-    # axis_settings = AxisSettings(0, 3, rect=(10, 10, 80, 40),
-    #                              xlim=(-0.1, 8.1), ylim=(-0.05, 0.4))
-    # export_settings = ExportSettings(2, r'pictures\test.png')
-    # pic_creator = PictureCreator(r'data_files\average_grid_density_sp_al.plt', 'macros\picture_creation.mcr',
-    #                              slice_settings, levels_settings, legend_settings, colormap_settings,
-    #                              axis_settings, export_settings)
-    # pic_creator.run_creation()
+
 
