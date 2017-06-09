@@ -5,8 +5,9 @@ import copy
 import enum
 import numpy as np
 import logging
+import re
 
-__version__ = '0.2'
+__version__ = '0.3'
 __author__ = 'Alexander Zhigalkin'
 
 logging.basicConfig(level=logging.INFO, format='%(msg)s')
@@ -343,7 +344,8 @@ def get_alterdata_command(equation: str, ignored_divided_by_zero=False, data_typ
 
 
 def _get_go_to_2d_macro(x_axis_var: int, y_axis_var: int, x_line_pos: float=0., y_line_pos: float=0.,
-                        rect: tuple = (10, 10, 90, 90), preserve_axis_length: bool = False, **kwargs) -> str:
+                        rect: tuple = (10, 10, 90, 90), x_to_y_ratio=1,
+                        preserve_axis_length: bool = False, **kwargs) -> str:
     """
     :param x_axis_var: int \n
         Номер переменной, откладываемой по горизонтальной оси
@@ -356,6 +358,8 @@ def _get_go_to_2d_macro(x_axis_var: int, y_axis_var: int, x_line_pos: float=0., 
     :param rect: tuple, optional \n
         Определяет положение прямоугольника сетки на frame, rect=(x1, y1, x2, y2),
         по умолчанию rect=(10, 10, 90, 90)
+    :param x_to_y_ratio: int, optional \n
+        Отношение масштаба на оси x к масштабу на оси y
     :param preserve_axis_length: bool, optional \n
         Сохраняемость масштаба осей при изменении их диапазона
     :param kwargs: xlim, ylim (интервалы по осям x и y соотвественно), тип tuple; пример: xlim=(0,1), ylim=(1,2)
@@ -365,6 +369,7 @@ def _get_go_to_2d_macro(x_axis_var: int, y_axis_var: int, x_line_pos: float=0., 
               "$!TWODAXIS XDETAIL{VARNUM = %s}\n" \
               "$!TWODAXIS YDETAIL{VARNUM = %s}\n" % (x_axis_var, y_axis_var)
     string3 = "$!TWODAXIS\n" \
+              "  DEPXTOYRATIO = %s\n" \
               "  GRIDAREA\n" \
               "  {\n" \
               "    EXTENTS\n" \
@@ -378,7 +383,7 @@ def _get_go_to_2d_macro(x_axis_var: int, y_axis_var: int, x_line_pos: float=0., 
               "$!TWODAXIS XDETAIL{AXISLINE{AXISALIGNMENT = WITHVIEWPORT}}\n" \
               "$!TWODAXIS XDETAIL{AXISLINE{POSITION = %s}}\n" \
               "$!TWODAXIS YDETAIL{AXISLINE{AXISALIGNMENT = WITHVIEWPORT}}\n" \
-              "$!TWODAXIS YDETAIL{AXISLINE{POSITION = %s}}\n" % (rect[0], rect[1], rect[2], rect[3],
+              "$!TWODAXIS YDETAIL{AXISLINE{POSITION = %s}}\n" % (x_to_y_ratio, rect[0], rect[1], rect[2], rect[3],
                                                                  x_line_pos, y_line_pos)
     if 'xlim' in kwargs and 'ylim' in kwargs:
         string2 = "$!TWODAXIS\n" \
@@ -448,8 +453,8 @@ def _get_axis_font_settings(x_title_font: Font = Font(), x_label_font: Font = Fo
               "$!TWODAXIS XDETAIL{TICKLABEL{TEXTSHAPE{ISITALIC = %s}}}\n" \
               "$!TWODAXIS XDETAIL{TICKLABEL{TEXTSHAPE{ISBOLD = %s}}}\n" \
               "$!TWODAXIS XDETAIL{TICKLABEL{OFFSET = %s}}\n" % (x_label_font.font_family,
-                                                                           x_label_font.height, x_label_font.is_italic,
-                                                                           x_label_font.is_bold, x_label_offset)
+                                                                x_label_font.height, x_label_font.is_italic,
+                                                                x_label_font.is_bold, x_label_offset)
     y_title = "$!TWODAXIS YDETAIL{TITLE{TEXTSHAPE{FONTFAMILY = '%s'}}}\n" \
               "$!TWODAXIS YDETAIL{TITLE{TEXTSHAPE{HEIGHT =%s}}}\n" \
               "$!TWODAXIS YDETAIL{TITLE{TEXTSHAPE{ISITALIC = %s}}}\n" \
@@ -462,8 +467,8 @@ def _get_axis_font_settings(x_title_font: Font = Font(), x_label_font: Font = Fo
               "$!TWODAXIS YDETAIL{TICKLABEL{TEXTSHAPE{ISITALIC = %s}}}\n" \
               "$!TWODAXIS YDETAIL{TICKLABEL{TEXTSHAPE{ISBOLD = %s}}}\n" \
               "$!TWODAXIS YDETAIL{TICKLABEL{OFFSET = %s}}\n" % (y_label_font.font_family,
-                                                                           y_label_font.height, y_label_font.is_italic,
-                                                                           y_label_font.is_bold, y_label_offset)
+                                                                y_label_font.height, y_label_font.is_italic,
+                                                                y_label_font.is_bold, y_label_offset)
     result = x_title + x_label + y_title + y_label
     return result
 
@@ -640,6 +645,165 @@ def _get_frame_size_commands(width: float, height: float):
     return result
 
 
+class _LayoutParserDescriptor:
+    def __init__(self, value=None, name: str = None):
+        self.value = value
+        self.name = name
+
+    def __get__(self, instance, owner):
+        if self.value is None:
+            raise ValueError('%s was not writen from layout' % self.name)
+        else:
+            return self.value
+
+    def __set__(self, instance, value):
+        self.value = value
+
+
+class LayoutParser:
+    """
+    Обеспечивает возможность парсинга .lay файлов и считывания некоторых настроек изображения, значения которых
+    сохраняются в следующие поля:
+
+    1. :param frame_width: float \n
+            Ширина фрейма.
+    2. :param frame_height: float \n
+            Высота фрейма.
+    3. :param x_y_axis_var: int \n
+            Номер переменной, откладываемой по оси X.
+    4. :param y_y_axis_var: int \n
+            Номер переменной, откладываемой по оси Y.
+    5. :param x_to_y_ratio: float \n
+            Отношение масштаба по оси X к масштабу по оси Y.
+    6. :param rect: tuple \n
+            Определяет положение прямоугольника сетки на frame, rect=(x1, y1, x2, y2).
+    7. :param xlim: tuple \n
+            Определяет интервал значений по оси X, xlim=(xmin, xmax).
+    8. :param ylim: tuple \n
+            Определяет интервал значений по оси Y, ylim=(ymin, ymax).
+    """
+
+    frame_width = _LayoutParserDescriptor(None, 'frame_width')
+    frame_height = _LayoutParserDescriptor(None, 'frame_height')
+    x_axis_var = _LayoutParserDescriptor(None, 'x_axis_var')
+    y_axis_var = _LayoutParserDescriptor(None, 'y_axis_var')
+    x_to_y_ratio = _LayoutParserDescriptor(None, 'x_to_y_ratio')
+    rect = _LayoutParserDescriptor(None, 'rect')
+    xlim = _LayoutParserDescriptor(None, 'xlim')
+    ylim = _LayoutParserDescriptor(None, 'ylim')
+
+    def __init__(self, layout_name: str):
+        """
+        :param layout_name: str \n
+                Имя .lay файла, с которого необходимо считать настройки изображения.
+        """
+        self.layout_name = layout_name
+        self.layout_content = None
+        self._frame_pattern = "\$!FRAMELAYOUT\s*\n" \
+                              "\s*SHOWHEADER\s*=\s*\w+\n" \
+                              "\s*HEADERCOLOR\s*=\s*\w+\n" \
+                              "\s*XYPOS\n" \
+                              "\s*{\n" \
+                              "\s*X\s*=\s*\d+\.?\d*\n" \
+                              "\s*Y\s*=\s*\d+\.?\d*\n" \
+                              "\s*}\n" \
+                              "\s*WIDTH\s*=\s*(\d+\.?\d*)\n" \
+                              "\s*HEIGHT\s*=\s*(\d+\.?\d*)\n"
+        self._axis_var_pattern = "\$!TWODAXIS \n" \
+                                 "\s*XDETAIL\n" \
+                                 "\s*{\n" \
+                                 "\s*VARNUM\s*=\s*(\d+\.?\d*)\n" \
+                                 "\s*}\n" \
+                                 "\s*YDETAIL\n" \
+                                 "\s*{\n" \
+                                 "\s*VARNUM\s*=\s*(\d+\.?\d*)\n" \
+                                 "\s*}\n?"
+        self._rect_pattern = "\$!TWODAXIS\s*\n" \
+                             "\s*DEPXTOYRATIO\s*=\s*(\d+\.?\d*)\n" \
+                             "\s*VIEWPORTPOSITION\n" \
+                             "\s*{\n" \
+                             "\s*X1\s*=\s*(\d+\.?\d*)\n" \
+                             "\s*Y1\s*=\s*(\d+\.?\d*)\n" \
+                             "\s*X2\s*=\s*(\d+\.?\d*)\n" \
+                             "\s*Y2\s*=\s*(\d+\.?\d*)\n" \
+                             "\s*}\n?"
+        self._xlim_pattern = "\$!TWODAXIS\s*\n" \
+                             "\s*XDETAIL\n" \
+                             "\s*{\n" \
+                             "\s*RANGEMIN\s*=\s*(-*\d+\.?\d*)\n" \
+                             "\s*RANGEMAX\s*=\s*(-*\d+\.?\d*)\n" \
+                             "\s*GRSPACING\s*=\s*\d+\.?\d*\n" \
+                             "\s*}\n?"
+        self._ylim_pattern = "\$!TWODAXIS\s*\n" \
+                             "\s*YDETAIL\n" \
+                             "\s*{\n" \
+                             "\s*RANGEMIN\s*=\s*(-*\d+\.?\d*)\n" \
+                             "\s*RANGEMAX\s*=\s*(-*\d+\.?\d*)\n" \
+                             "\s*GRSPACING\s*=\s*\d+\.?\d*\n" \
+                             "\s*}\n?"
+
+    @classmethod
+    def _get_frame_size(cls, frame_pattern: str, layout_content: str):
+        logging.info('Get frame size')
+        match = re.search(frame_pattern, layout_content)
+        frame_width = float(match.group(1))
+        frame_height = float(match.group(2))
+        return frame_width, frame_height
+
+    @classmethod
+    def _get_axis_var_numbers(cls, axis_var_pattern: str, layout_content: str):
+        logging.info('Get axis varnumbers')
+        match = re.search(axis_var_pattern, layout_content)
+        x_axis_var = int(match.group(1))
+        y_axis_var = int(match.group(2))
+        return x_axis_var, y_axis_var
+
+    @classmethod
+    def _get_rect(cls, rect_pattern: str, layout_content: str):
+        logging.info('Get rectangle size')
+        match = re.search(rect_pattern, layout_content)
+        x_to_y_ratio = float(match.group(1))
+        x1 = float(match.group(2))
+        y1 = float(match.group(3))
+        x2 = float(match.group(4))
+        y2 = float(match.group(5))
+        rect = (x1, y1, x2, y2)
+        return x_to_y_ratio, rect
+
+    @classmethod
+    def _get_xlim(cls, xlim_pattern: str, layout_content: str):
+        logging.info('Get xlim')
+        match = re.search(xlim_pattern, layout_content)
+        min = float(match.group(1))
+        max = float(match.group(2))
+        return min, max
+
+    @classmethod
+    def _get_ylim(cls, ylim_pattern: str, layout_content: str):
+        logging.info('Get ylim')
+        match = re.search(ylim_pattern, layout_content)
+        min = float(match.group(1))
+        max = float(match.group(2))
+        return min, max
+
+    @classmethod
+    def _get_layout_content(cls, layout_name: str) -> str:
+        logging.info('Reading layout file')
+        with open(layout_name, 'r') as file:
+            content = file.read()
+        return content
+
+    def run_parsing(self):
+        logging.info('START PARSING')
+        self.layout_content = self._get_layout_content(self.layout_name)
+        self.frame_width, self.frame_height = self._get_frame_size(self._frame_pattern, self.layout_content)
+        self.x_axis_var, self.y_axis_var = self._get_axis_var_numbers(self._axis_var_pattern, self.layout_content)
+        self.x_to_y_ratio, self.rect = self._get_rect(self._rect_pattern, self.layout_content)
+        self.xlim = self._get_xlim(self._xlim_pattern, self.layout_content)
+        self.ylim = self._get_ylim(self._ylim_pattern, self.layout_content)
+        logging.info('FINISH PARSING')
+
+
 class FrameSettings:
     def __init__(self, width: float=9, height: float=8):
         """
@@ -728,7 +892,7 @@ class ColormapSettings:
 
 class AxisSettings:
     def __init__(self, x_axis_var: int, y_axis_var: int, rect: tuple = (10, 10, 90, 90), x_line_pos: float=0,
-                 y_line_pos: float=0, preserve_axis_length: bool = False,
+                 y_line_pos: float=0, x_to_y_ratio=1, preserve_axis_length: bool = False,
                  x_title_font: Font = Font(), x_label_font: Font = Font(), x_title_offset: float=5.,
                  x_label_offset: float = 1., y_title_font: Font = Font(), y_label_font: Font = Font(),
                  y_title_offset: float=5., y_label_offset: float = 1., **kwargs):
@@ -746,6 +910,8 @@ class AxisSettings:
             Позиция горизонтальной оси по вертикали
         :param y_line_pos: float \n
             Позиция вертикальной оси по горизонтали \n
+        :param x_to_y_ratio: int, optional \n
+            Отношение масштаба на оси x к масштабу на оси y
         :param x_title_font: Font, optional \n
             экземпляр класса Font, содержащий настройки шрифта для заголовка оси x
         :param x_label_font: Font, optional \n
@@ -767,6 +933,7 @@ class AxisSettings:
         self.x_axis_var = x_axis_var
         self.y_axis_var = y_axis_var
         self.rect = rect
+        self.x_to_y_ratio = x_to_y_ratio
         self.preserve_axis_scale = preserve_axis_length
         self.x_line_pos = x_line_pos
         self.y_line_pos = y_line_pos
@@ -845,7 +1012,7 @@ def _get_create_picture_macro(axis_settings: AxisSettings, ticks_settings: Ticks
     extract_slice = _get_extract_slice_command()
     show_contour = _get_show_contour_command()
     go_to_2d = _get_go_to_2d_macro(axis_settings.x_axis_var, axis_settings.y_axis_var, axis_settings.x_line_pos,
-                                   axis_settings.y_line_pos, axis_settings.rect,
+                                   axis_settings.y_line_pos, axis_settings.rect, axis_settings.x_to_y_ratio,
                                    axis_settings.preserve_axis_scale, **axis_settings.kwargs)
     axis_font_settings = _get_axis_font_settings(axis_settings.x_title_font, axis_settings.x_label_font,
                                                  axis_settings.x_title_offset, axis_settings.x_label_offset,
@@ -975,7 +1142,8 @@ class PictureCreator:
     def add_to_existing_macro(self):
         """
         Добавляет команды в существующий макрос. Если файла с макросом не существует, создает пустой файл
-        и записывает в него команды.
+        и записывает в него команды. Если макрос, в который осуществляется запись, заканчивается командой
+        '$!Quit', то перед записью его содержимое удаляется.
 
         :return: None
         """

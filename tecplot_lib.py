@@ -7,7 +7,7 @@ import numpy as np
 import logging
 import re
 
-__version__ = '0.2'
+__version__ = '0.3'
 __author__ = 'Alexander Zhigalkin'
 
 logging.basicConfig(level=logging.INFO, format='%(msg)s')
@@ -661,6 +661,28 @@ class _LayoutParserDescriptor:
 
 
 class LayoutParser:
+    """
+    Обеспечивает возможность парсинга .lay файлов и считывания некоторых настроек изображения, значения которых
+    сохраняются в следующие поля:
+
+    1. :param frame_width: float \n
+            Ширина фрейма.
+    2. :param frame_height: float \n
+            Высота фрейма.
+    3. :param x_y_axis_var: int \n
+            Номер переменной, откладываемой по оси X.
+    4. :param y_y_axis_var: int \n
+            Номер переменной, откладываемой по оси Y.
+    5. :param x_to_y_ratio: float \n
+            Отношение масштаба по оси X к масштабу по оси Y.
+    6. :param rect: tuple \n
+            Определяет положение прямоугольника сетки на frame, rect=(x1, y1, x2, y2).
+    7. :param xlim: tuple \n
+            Определяет интервал значений по оси X, xlim=(xmin, xmax).
+    8. :param ylim: tuple \n
+            Определяет интервал значений по оси Y, ylim=(ymin, ymax).
+    """
+
     frame_width = _LayoutParserDescriptor(None, 'frame_width')
     frame_height = _LayoutParserDescriptor(None, 'frame_height')
     x_axis_var = _LayoutParserDescriptor(None, 'x_axis_var')
@@ -671,52 +693,58 @@ class LayoutParser:
     ylim = _LayoutParserDescriptor(None, 'ylim')
 
     def __init__(self, layout_name: str):
+        """
+        :param layout_name: str \n
+                Имя .lay файла, с которого необходимо считать настройки изображения.
+        """
         self.layout_name = layout_name
-        self._frame_pattern = "$!FRAMELAYOUT \n" \
-                              "  SHOWHEADER = \w+\n" \
-                              "  HEADERCOLOR = \w+\n" \
-                              "  XYPOS\n" \
-                              "    {\n" \
-                              "    X = \d+\.?\d*\n" \
-                              "    Y = \d+\.?\d*\n" \
-                              "    }\n" \
-                              "  WIDTH = (\d+\.?\d*)\n" \
-                              "  HEIGHT = (\d+\.?\d*)\n?"
-        self._axis_var_pattern = "$!TWODAXIS \n" \
-                                 "  XDETAIL\n" \
-                                 "    {\n" \
-                                 "    VARNUM = (\d+\.?\d*)\n" \
-                                 "    }\n" \
-                                 "  YDETAIL\n" \
-                                 "    {\n" \
-                                 "    VARNUM = (\d+\.?\d*)\n" \
-                                 "    }\n?"
-        self._rect_pattern = "$!TWODAXIS \n" \
-                             "  DEPXTOYRATIO = (\d+\.?\d*)\n" \
-                             "  VIEWPORTPOSITION\n" \
-                             "    {\n" \
-                             "    X1 = (\d+\.?\d*)\n" \
-                             "    Y1 = (\d+\.?\d*)\n" \
-                             "    X2 = (\d+\.?\d*)\n" \
-                             "    Y2 = (\d+\.?\d*)\n" \
-                             "    }\n?"
-        self._xlim_pattern = "$!TWODAXIS \n" \
-                             "  XDETAIL\n" \
-                             "    {\n" \
-                             "    RANGEMIN = (\d+\.?\d*)\n" \
-                             "    RANGEMAX = (\d+\.?\d*)\n" \
-                             "    GRSPACING = \d+\.?\d*\n" \
-                             "    }\n?"
-        self._ylim_pattern = "$!TWODAXIS \n" \
-                             "  YDETAIL\n" \
-                             "    {\n" \
-                             "    RANGEMIN = (\d+\.?\d*)\n" \
-                             "    RANGEMAX = (\d+\.?\d*)\n" \
-                             "    GRSPACING = \d+\.?\d*\n" \
-                             "    }\n?"
+        self.layout_content = None
+        self._frame_pattern = "\$!FRAMELAYOUT\s*\n" \
+                              "\s*SHOWHEADER\s*=\s*\w+\n" \
+                              "\s*HEADERCOLOR\s*=\s*\w+\n" \
+                              "\s*XYPOS\n" \
+                              "\s*{\n" \
+                              "\s*X\s*=\s*\d+\.?\d*\n" \
+                              "\s*Y\s*=\s*\d+\.?\d*\n" \
+                              "\s*}\n" \
+                              "\s*WIDTH\s*=\s*(\d+\.?\d*)\n" \
+                              "\s*HEIGHT\s*=\s*(\d+\.?\d*)\n"
+        self._axis_var_pattern = "\$!TWODAXIS \n" \
+                                 "\s*XDETAIL\n" \
+                                 "\s*{\n" \
+                                 "\s*VARNUM\s*=\s*(\d+\.?\d*)\n" \
+                                 "\s*}\n" \
+                                 "\s*YDETAIL\n" \
+                                 "\s*{\n" \
+                                 "\s*VARNUM\s*=\s*(\d+\.?\d*)\n" \
+                                 "\s*}\n?"
+        self._rect_pattern = "\$!TWODAXIS\s*\n" \
+                             "\s*DEPXTOYRATIO\s*=\s*(\d+\.?\d*)\n" \
+                             "\s*VIEWPORTPOSITION\n" \
+                             "\s*{\n" \
+                             "\s*X1\s*=\s*(\d+\.?\d*)\n" \
+                             "\s*Y1\s*=\s*(\d+\.?\d*)\n" \
+                             "\s*X2\s*=\s*(\d+\.?\d*)\n" \
+                             "\s*Y2\s*=\s*(\d+\.?\d*)\n" \
+                             "\s*}\n?"
+        self._xlim_pattern = "\$!TWODAXIS\s*\n" \
+                             "\s*XDETAIL\n" \
+                             "\s*{\n" \
+                             "\s*RANGEMIN\s*=\s*(-*\d+\.?\d*)\n" \
+                             "\s*RANGEMAX\s*=\s*(-*\d+\.?\d*)\n" \
+                             "\s*GRSPACING\s*=\s*\d+\.?\d*\n" \
+                             "\s*}\n?"
+        self._ylim_pattern = "\$!TWODAXIS\s*\n" \
+                             "\s*YDETAIL\n" \
+                             "\s*{\n" \
+                             "\s*RANGEMIN\s*=\s*(-*\d+\.?\d*)\n" \
+                             "\s*RANGEMAX\s*=\s*(-*\d+\.?\d*)\n" \
+                             "\s*GRSPACING\s*=\s*\d+\.?\d*\n" \
+                             "\s*}\n?"
 
     @classmethod
-    def _get_frame_settings(cls, frame_pattern: str, layout_content: str):
+    def _get_frame_size(cls, frame_pattern: str, layout_content: str):
+        logging.info('Get frame size')
         match = re.search(frame_pattern, layout_content)
         frame_width = float(match.group(1))
         frame_height = float(match.group(2))
@@ -724,6 +752,7 @@ class LayoutParser:
 
     @classmethod
     def _get_axis_var_numbers(cls, axis_var_pattern: str, layout_content: str):
+        logging.info('Get axis varnumbers')
         match = re.search(axis_var_pattern, layout_content)
         x_axis_var = int(match.group(1))
         y_axis_var = int(match.group(2))
@@ -731,6 +760,7 @@ class LayoutParser:
 
     @classmethod
     def _get_rect(cls, rect_pattern: str, layout_content: str):
+        logging.info('Get rectangle size')
         match = re.search(rect_pattern, layout_content)
         x_to_y_ratio = float(match.group(1))
         x1 = float(match.group(2))
@@ -742,13 +772,36 @@ class LayoutParser:
 
     @classmethod
     def _get_xlim(cls, xlim_pattern: str, layout_content: str):
+        logging.info('Get xlim')
         match = re.search(xlim_pattern, layout_content)
         min = float(match.group(1))
         max = float(match.group(2))
         return min, max
 
+    @classmethod
+    def _get_ylim(cls, ylim_pattern: str, layout_content: str):
+        logging.info('Get ylim')
+        match = re.search(ylim_pattern, layout_content)
+        min = float(match.group(1))
+        max = float(match.group(2))
+        return min, max
 
+    @classmethod
+    def _get_layout_content(cls, layout_name: str) -> str:
+        logging.info('Reading layout file')
+        with open(layout_name, 'r') as file:
+            content = file.read()
+        return content
 
+    def run_parsing(self):
+        logging.info('START PARSING')
+        self.layout_content = self._get_layout_content(self.layout_name)
+        self.frame_width, self.frame_height = self._get_frame_size(self._frame_pattern, self.layout_content)
+        self.x_axis_var, self.y_axis_var = self._get_axis_var_numbers(self._axis_var_pattern, self.layout_content)
+        self.x_to_y_ratio, self.rect = self._get_rect(self._rect_pattern, self.layout_content)
+        self.xlim = self._get_xlim(self._xlim_pattern, self.layout_content)
+        self.ylim = self._get_ylim(self._ylim_pattern, self.layout_content)
+        logging.info('FINISH PARSING')
 
 
 class FrameSettings:
@@ -1089,7 +1142,8 @@ class PictureCreator:
     def add_to_existing_macro(self):
         """
         Добавляет команды в существующий макрос. Если файла с макросом не существует, создает пустой файл
-        и записывает в него команды.
+        и записывает в него команды. Если макрос, в который осуществляется запись, заканчивается командой
+        '$!Quit', то перед записью его содержимое удаляется.
 
         :return: None
         """
