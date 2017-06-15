@@ -683,15 +683,6 @@ class LayoutParser:
             Определяет интервал значений по оси Y, ylim=(ymin, ymax).
     """
 
-    frame_width = _LayoutParserDescriptor(None, 'frame_width')
-    frame_height = _LayoutParserDescriptor(None, 'frame_height')
-    x_axis_var = _LayoutParserDescriptor(None, 'x_axis_var')
-    y_axis_var = _LayoutParserDescriptor(None, 'y_axis_var')
-    x_to_y_ratio = _LayoutParserDescriptor(None, 'x_to_y_ratio')
-    rect = _LayoutParserDescriptor(None, 'rect')
-    xlim = _LayoutParserDescriptor(None, 'xlim')
-    ylim = _LayoutParserDescriptor(None, 'ylim')
-
     def __init__(self, layout_name: str):
         """
         :param layout_name: str \n
@@ -699,6 +690,14 @@ class LayoutParser:
         """
         self.layout_name = layout_name
         self.layout_content = None
+        self.frame_width = _LayoutParserDescriptor(None, 'frame_width')
+        self.frame_height = _LayoutParserDescriptor(None, 'frame_height')
+        self.x_axis_var = _LayoutParserDescriptor(None, 'x_axis_var')
+        self.y_axis_var = _LayoutParserDescriptor(None, 'y_axis_var')
+        self.x_to_y_ratio = _LayoutParserDescriptor(None, 'x_to_y_ratio')
+        self.rect = _LayoutParserDescriptor(None, 'rect')
+        self.xlim = _LayoutParserDescriptor(None, 'xlim')
+        self.ylim = _LayoutParserDescriptor(None, 'ylim')
         self._frame_pattern = "\$!FRAMELAYOUT\s*\n" \
                               "\s*SHOWHEADER\s*=\s*\w+\n" \
                               "\s*HEADERCOLOR\s*=\s*\w+\n" \
@@ -776,6 +775,7 @@ class LayoutParser:
         match = re.search(xlim_pattern, layout_content)
         min = float(match.group(1))
         max = float(match.group(2))
+        logging.debug('xlim = (%s, %s)' % (min, max))
         return min, max
 
     @classmethod
@@ -784,11 +784,12 @@ class LayoutParser:
         match = re.search(ylim_pattern, layout_content)
         min = float(match.group(1))
         max = float(match.group(2))
+        logging.debug('ylim = (%s, %s)' % (min, max))
         return min, max
 
     @classmethod
     def _get_layout_content(cls, layout_name: str) -> str:
-        logging.info('Reading layout file')
+        logging.info("Reading layout file '%s'" % layout_name )
         with open(layout_name, 'r') as file:
             content = file.read()
         return content
