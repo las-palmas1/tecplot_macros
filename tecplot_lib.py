@@ -406,69 +406,89 @@ def _get_go_to_2d_macro(x_axis_var: int, y_axis_var: int, x_line_pos: float=0., 
 
 
 class Font:
-    def __init__(self, font_family='Helvetica', is_bold=False, is_italic=False, height=3.):
+    def __init__(self, font_family: str =None, is_bold: bool=None, is_italic: bool=None, height: float=None):
         self.font_family = font_family
         if is_bold:
             self.is_bold = 'YES'
-        else:
+        elif not is_bold and is_bold is not None:
             self.is_bold = 'NO'
+        else:
+            self.is_bold = is_bold
         if is_italic:
             self.is_italic = 'YES'
-        else:
+        elif not is_italic and is_italic is not None:
             self.is_italic = 'NO'
+        else:
+            self.is_italic = is_italic
         self.height = height
 
 
 def _get_legend_font_settings(header_font: Font = Font(), number_font: Font = Font()) -> str:
-    header_settings = "$!GLOBALCONTOUR 1  LEGEND{HEADERTEXTSHAPE{FONTFAMILY = '%s'}}\n" \
-                      "$!GLOBALCONTOUR 1  LEGEND{HEADERTEXTSHAPE{HEIGHT = %s}}\n" \
-                      "$!GLOBALCONTOUR 1  LEGEND{HEADERTEXTSHAPE{ISITALIC = %s}}\n" \
-                      "$!GLOBALCONTOUR 1  LEGEND{HEADERTEXTSHAPE{ISBOLD = %s}}\n" % (header_font.font_family,
-                                                                                     header_font.height,
-                                                                                     header_font.is_italic,
-                                                                                     header_font.is_bold)
-    number_settings = "$!GLOBALCONTOUR 1  LEGEND{NUMBERTEXTSHAPE{FONTFAMILY = '%s'}}\n" \
-                      "$!GLOBALCONTOUR 1  LEGEND{NUMBERTEXTSHAPE{HEIGHT = %s}}\n" \
-                      "$!GLOBALCONTOUR 1  LEGEND{NUMBERTEXTSHAPE{ISITALIC = %s}}\n" \
-                      "$!GLOBALCONTOUR 1  LEGEND{NUMBERTEXTSHAPE{ISBOLD = %s}}\n" % (number_font.font_family,
-                                                                                     number_font.height,
-                                                                                     number_font.is_italic,
-                                                                                     number_font.is_bold)
+    header_settings_temp = "$!GLOBALCONTOUR 1  LEGEND{HEADERTEXTSHAPE{FONTFAMILY = '%s'}}\n" * \
+                           (header_font.font_family is not None) + \
+                           "$!GLOBALCONTOUR 1  LEGEND{HEADERTEXTSHAPE{HEIGHT = %s}}\n" * \
+                           (header_font.height is not None) + \
+                           "$!GLOBALCONTOUR 1  LEGEND{HEADERTEXTSHAPE{ISITALIC = %s}}\n" * \
+                           (header_font.is_italic is not None) + \
+                           "$!GLOBALCONTOUR 1  LEGEND{HEADERTEXTSHAPE{ISBOLD = %s}}\n" * \
+                           (header_font.is_bold is not None)
+    number_settings_temp = "$!GLOBALCONTOUR 1  LEGEND{NUMBERTEXTSHAPE{FONTFAMILY = '%s'}}\n" * \
+                           (header_font.font_family is not None) + \
+                           "$!GLOBALCONTOUR 1  LEGEND{NUMBERTEXTSHAPE{HEIGHT = %s}}\n" * \
+                           (header_font.height is not None) + \
+                           "$!GLOBALCONTOUR 1  LEGEND{NUMBERTEXTSHAPE{ISITALIC = %s}}\n" * \
+                           (header_font.is_italic is not None) + \
+                           "$!GLOBALCONTOUR 1  LEGEND{NUMBERTEXTSHAPE{ISBOLD = %s}}\n" * \
+                           (header_font.is_bold is not None)
+    header_font_args = (header_font.font_family, header_font.height, header_font.is_italic, header_font.is_bold)
+    header_settings = header_settings_temp % _filter_args_for_str_formatting(header_font_args)
+    number_font_args = (number_font.font_family, number_font.height, number_font.is_italic, number_font.is_bold)
+    number_settings = number_settings_temp % _filter_args_for_str_formatting(number_font_args)
     result = header_settings + number_settings
     return result
 
 
-def _get_axis_font_settings(x_title_font: Font = Font(), x_label_font: Font = Font(), x_title_offset=5.,
-                            x_label_offset=1., y_title_font: Font = Font(), y_label_font: Font = Font(),
-                            y_title_offset=5., y_label_offset=1.) -> str:
-    x_title = "$!TWODAXIS XDETAIL{TITLE{TEXTSHAPE{FONTFAMILY = '%s'}}}\n" \
-              "$!TWODAXIS XDETAIL{TITLE{TEXTSHAPE{HEIGHT =%s}}}\n" \
-              "$!TWODAXIS XDETAIL{TITLE{TEXTSHAPE{ISITALIC = %s}}}\n" \
-              "$!TWODAXIS XDETAIL{TITLE{TEXTSHAPE{ISBOLD = %s}}}\n" \
-              "$!TWODAXIS XDETAIL{TITLE{OFFSET = %s}}\n" % (x_title_font.font_family, x_title_font.height,
-                                                            x_title_font.is_italic, x_title_font.is_bold,
-                                                            x_title_offset)
-    x_label = "$!TWODAXIS XDETAIL{TICKLABEL{TEXTSHAPE{FONTFAMILY = '%s'}}}\n" \
-              "$!TWODAXIS XDETAIL{TICKLABEL{TEXTSHAPE{HEIGHT =%s}}}\n" \
-              "$!TWODAXIS XDETAIL{TICKLABEL{TEXTSHAPE{ISITALIC = %s}}}\n" \
-              "$!TWODAXIS XDETAIL{TICKLABEL{TEXTSHAPE{ISBOLD = %s}}}\n" \
-              "$!TWODAXIS XDETAIL{TICKLABEL{OFFSET = %s}}\n" % (x_label_font.font_family,
-                                                                x_label_font.height, x_label_font.is_italic,
-                                                                x_label_font.is_bold, x_label_offset)
-    y_title = "$!TWODAXIS YDETAIL{TITLE{TEXTSHAPE{FONTFAMILY = '%s'}}}\n" \
-              "$!TWODAXIS YDETAIL{TITLE{TEXTSHAPE{HEIGHT =%s}}}\n" \
-              "$!TWODAXIS YDETAIL{TITLE{TEXTSHAPE{ISITALIC = %s}}}\n" \
-              "$!TWODAXIS YDETAIL{TITLE{TEXTSHAPE{ISBOLD = %s}}}\n" \
-              "$!TWODAXIS YDETAIL{TITLE{OFFSET = %s}}\n" % (y_title_font.font_family, y_title_font.height,
-                                                            y_title_font.is_italic, y_title_font.is_bold,
-                                                            y_title_offset)
-    y_label = "$!TWODAXIS YDETAIL{TICKLABEL{TEXTSHAPE{FONTFAMILY = '%s'}}}\n" \
-              "$!TWODAXIS YDETAIL{TICKLABEL{TEXTSHAPE{HEIGHT =%s}}}\n" \
-              "$!TWODAXIS YDETAIL{TICKLABEL{TEXTSHAPE{ISITALIC = %s}}}\n" \
-              "$!TWODAXIS YDETAIL{TICKLABEL{TEXTSHAPE{ISBOLD = %s}}}\n" \
-              "$!TWODAXIS YDETAIL{TICKLABEL{OFFSET = %s}}\n" % (y_label_font.font_family,
-                                                                y_label_font.height, y_label_font.is_italic,
-                                                                y_label_font.is_bold, y_label_offset)
+def _get_axis_font_settings(x_title_font: Font = Font(), x_label_font: Font = Font(), x_title_offset: float=None,
+                            x_label_offset: float=None, y_title_font: Font = Font(), y_label_font: Font = Font(),
+                            y_title_offset: float=None, y_label_offset: float=None) -> str:
+    x_title_templ = "$!TWODAXIS XDETAIL{TITLE{TEXTSHAPE{FONTFAMILY = '%s'}}}\n" * \
+                    (x_title_font.font_family is not None) + \
+                    "$!TWODAXIS XDETAIL{TITLE{TEXTSHAPE{HEIGHT =%s}}}\n" * (x_title_font.height is not None) + \
+                    "$!TWODAXIS XDETAIL{TITLE{TEXTSHAPE{ISITALIC = %s}}}\n" * (x_title_font.is_italic is not None) + \
+                    "$!TWODAXIS XDETAIL{TITLE{TEXTSHAPE{ISBOLD = %s}}}\n" * (x_title_font.is_bold is not None) + \
+                    "$!TWODAXIS XDETAIL{TITLE{OFFSET = %s}}\n" * (x_title_offset is not None)
+    x_title_args = (x_title_font.font_family, x_title_font.height, x_title_font.is_italic, x_title_font.is_bold,
+                    x_title_offset)
+    x_title = x_title_templ % _filter_args_for_str_formatting(x_title_args)
+    x_label_templ = "$!TWODAXIS XDETAIL{TICKLABEL{TEXTSHAPE{FONTFAMILY = '%s'}}}\n" * \
+                    (x_label_font.font_family is not None) + \
+                    "$!TWODAXIS XDETAIL{TICKLABEL{TEXTSHAPE{HEIGHT =%s}}}\n" * (x_label_font.height is not None) + \
+                    "$!TWODAXIS XDETAIL{TICKLABEL{TEXTSHAPE{ISITALIC = %s}}}\n" * \
+                    (x_label_font.is_italic is not None) + \
+                    "$!TWODAXIS XDETAIL{TICKLABEL{TEXTSHAPE{ISBOLD = %s}}}\n" * (x_label_font.is_bold is not None) + \
+                    "$!TWODAXIS XDETAIL{TICKLABEL{OFFSET = %s}}\n" * (x_label_offset is not None)
+    x_label_args = (x_label_font.font_family, x_label_font.height, x_label_font.is_italic, x_label_font.is_bold,
+                    x_label_offset)
+    x_label = x_label_templ % _filter_args_for_str_formatting(x_label_args)
+    y_title_templ = "$!TWODAXIS YDETAIL{TITLE{TEXTSHAPE{FONTFAMILY = '%s'}}}\n" * \
+                    (y_title_font.font_family is not None) + \
+                    "$!TWODAXIS YDETAIL{TITLE{TEXTSHAPE{HEIGHT =%s}}}\n" * (y_title_font.height is not None) + \
+                    "$!TWODAXIS YDETAIL{TITLE{TEXTSHAPE{ISITALIC = %s}}}\n" * (y_title_font.is_italic is not None) + \
+                    "$!TWODAXIS YDETAIL{TITLE{TEXTSHAPE{ISBOLD = %s}}}\n" * (y_title_font.is_bold is not None) + \
+                    "$!TWODAXIS YDETAIL{TITLE{OFFSET = %s}}\n" * (y_title_offset is not None)
+    y_title_args = (y_title_font.font_family, y_title_font.height, y_title_font.is_italic, y_title_font.is_bold,
+                    y_title_offset)
+    y_title = y_title_templ % _filter_args_for_str_formatting(y_title_args)
+    y_label_templ = "$!TWODAXIS YDETAIL{TICKLABEL{TEXTSHAPE{FONTFAMILY = '%s'}}}\n" * \
+                    (y_label_font.font_family is not None) + \
+                    "$!TWODAXIS YDETAIL{TICKLABEL{TEXTSHAPE{HEIGHT =%s}}}\n" * (y_label_font.height is not None) + \
+                    "$!TWODAXIS YDETAIL{TICKLABEL{TEXTSHAPE{ISITALIC = %s}}}\n" * \
+                    (y_label_font.is_italic is not None) + \
+                    "$!TWODAXIS YDETAIL{TICKLABEL{TEXTSHAPE{ISBOLD = %s}}}\n" * (y_label_font.is_bold is not None) + \
+                    "$!TWODAXIS YDETAIL{TICKLABEL{OFFSET = %s}}\n" * (y_label_offset is not None)
+    y_label_args = (y_label_font.font_family, y_label_font.height, y_label_font.is_italic, y_label_font.is_bold,
+                    y_label_offset)
+    y_label = y_label_templ % _filter_args_for_str_formatting(y_label_args)
     result = x_title + x_label + y_title + y_label
     return result
 
@@ -489,11 +509,19 @@ def _get_levels_setting_macro(variable_number: int, min_level, max_level,
     return result
 
 
-def get_ticks_settings_macro(x_auto_grid: bool = True, x_major_thickness: float =0.5, x_major_length: float = 2,
-                             x_minor_thickness: float =0.12, x_minor_length: float = 1.2,
-                             y_auto_grid: bool = True, y_major_thickness: float =0.5, y_major_length: float = 2.,
-                             y_minor_thickness: float =0.12, y_minor_length: float = 1.2,
-                             **kwargs):
+def _filter_args_for_str_formatting(args: tuple) -> tuple:
+    args_list = []
+    for i in args:
+        if i is not None:
+            args_list.append(i)
+    return tuple(args_list)
+
+
+def _get_ticks_settings_macro(x_auto_grid: bool = True, x_major_thickness: float =None, x_major_length: float = None,
+                              x_minor_thickness: float = None, x_minor_length: float = None,
+                              y_auto_grid: bool = True, y_major_thickness: float = None, y_major_length: float = None,
+                              y_minor_thickness: float = None, y_minor_length: float = None,
+                              **kwargs):
     """
     :param x_auto_grid: bool, optional \n
         Параметр регулирует автонастройку сетки на оси x
@@ -519,20 +547,22 @@ def get_ticks_settings_macro(x_auto_grid: bool = True, x_major_thickness: float 
         если y_auto_grid == False \n
     :return: str
     """
-    result = "$!TWODAXIS XDETAIL{AUTOGRID = %s}\n"  \
-             "$!TWODAXIS XDETAIL{TICKS{LENGTH = %s}}\n" \
-             "$!TWODAXIS XDETAIL{TICKS{LINETHICKNESS = %s}}\n" \
-             "$!TWODAXIS XDETAIL{TICKS{MINORLENGTH = %s}}\n" \
-             "$!TWODAXIS XDETAIL{TICKS{MINORLINETHICKNESS = %s}}\n" \
-             "$!TWODAXIS YDETAIL{AUTOGRID = %s}\n" \
-             "$!TWODAXIS YDETAIL{TICKS{LENGTH = %s}}\n" \
-             "$!TWODAXIS YDETAIL{TICKS{LINETHICKNESS = %s}}\n" \
-             "$!TWODAXIS YDETAIL{TICKS{MINORLENGTH = %s}}\n" \
-             "$!TWODAXIS YDETAIL{TICKS{MINORLINETHICKNESS = %s}}\n" % (x_auto_grid.__str__().upper(), x_major_length,
-                                                                       x_major_thickness, x_minor_length,
-                                                                       x_minor_thickness, y_auto_grid.__str__().upper(),
-                                                                       y_major_length, y_major_thickness,
-                                                                       y_minor_length, y_minor_thickness)
+    template = "$!TWODAXIS XDETAIL{AUTOGRID = %s}\n" + \
+               "$!TWODAXIS XDETAIL{TICKS{LENGTH = %s}}\n" * (x_major_length is not None) + \
+               "$!TWODAXIS XDETAIL{TICKS{LINETHICKNESS = %s}}\n" * (x_major_thickness is not None) + \
+               "$!TWODAXIS XDETAIL{TICKS{MINORLENGTH = %s}}\n" * (x_minor_length is not None) + \
+               "$!TWODAXIS XDETAIL{TICKS{MINORLINETHICKNESS = %s}}\n" * (x_minor_thickness is not None) + \
+               "$!TWODAXIS YDETAIL{AUTOGRID = %s}\n" + \
+               "$!TWODAXIS YDETAIL{TICKS{LENGTH = %s}}\n" * (y_major_length is not None) + \
+               "$!TWODAXIS YDETAIL{TICKS{LINETHICKNESS = %s}}\n" * (y_major_thickness is not None) + \
+               "$!TWODAXIS YDETAIL{TICKS{MINORLENGTH = %s}}\n" * (y_minor_length is not None) + \
+               "$!TWODAXIS YDETAIL{TICKS{MINORLINETHICKNESS = %s}}\n" * (y_minor_thickness is not None)
+    args_for_formatting = (x_auto_grid.__str__().upper(), x_major_length, x_major_thickness, x_minor_length,
+                           x_minor_thickness,
+                           y_auto_grid.__str__().upper(), y_major_length, y_major_thickness, y_minor_length,
+                           y_minor_thickness)
+    result = template % _filter_args_for_str_formatting(args_for_formatting)
+
     if not x_auto_grid and 'x_spacing' in kwargs and 'x_minor_num_ticks' in kwargs:
         result += "$!TWODAXIS XDETAIL{GRSPACING = %s}\n" \
                   "$!TWODAXIS XDETAIL{TICKS{NUMMINORTICKS = %s}}\n" % (kwargs['x_spacing'], kwargs['x_minor_num_ticks'])
@@ -717,15 +747,24 @@ class LayoutParser:
                                  "\s*{\n" \
                                  "\s*VARNUM\s*=\s*(\d+\.?\d*)\n" \
                                  "\s*}\n?"
-        self._rect_pattern = "\$!TWODAXIS\s*\n" \
-                             "\s*DEPXTOYRATIO\s*=\s*(\d+\.?\d*)\n" \
-                             "\s*VIEWPORTPOSITION\n" \
-                             "\s*{\n" \
-                             "\s*X1\s*=\s*(\d+\.?\d*)\n" \
-                             "\s*Y1\s*=\s*(\d+\.?\d*)\n" \
-                             "\s*X2\s*=\s*(\d+\.?\d*)\n" \
-                             "\s*Y2\s*=\s*(\d+\.?\d*)\n" \
-                             "\s*}\n?"
+        self.x_to_y_ratio_pattern = "\$!TWODAXIS\s*\n" \
+                                    "\s*DEPXTOYRATIO\s*=\s*(\d+\.?\d*)\n"
+        self.x1_pattern = "\$!TWODAXIS\s*\n" \
+                          "\s*DEPXTOYRATIO\s*=\s*\d+\.?\d*\n" \
+                          ".*\n?.*\n?.*\n?.*\n?.*\n?" \
+                          "\s*X1\\s*=\\s*(\\d+\\.?\\d*)\n"
+        self.y1_pattern = "\$!TWODAXIS\s*\n" \
+                          "\s*DEPXTOYRATIO\s*=\s*\d+\.?\d*\n" \
+                          ".*\n?.*\n?.*\n?.*\n?.*\n?" \
+                          "\s*Y1\\s*=\\s*(\\d+\\.?\\d*)\n"
+        self.x2_pattern = "\$!TWODAXIS\s*\n" \
+                          "\s*DEPXTOYRATIO\s*=\s*\d+\.?\d*\n" \
+                          ".*\n?.*\n?.*\n?.*\n?.*\n?" \
+                          "\s*X2\\s*=\\s*(\\d+\\.?\\d*)\n"
+        self.y2_pattern = "\$!TWODAXIS\s*\n" \
+                          "\s*DEPXTOYRATIO\s*=\s*\d+\.?\d*\n" \
+                          ".*\n?.*\n?.*\n?.*\n?.*\n?" \
+                          "\s*Y2\\s*=\\s*(\\d+\\.?\\d*)\n"
         self._xlim_pattern = "\$!TWODAXIS\s*\n" \
                              "\s*XDETAIL\n" \
                              "\s*{\n" \
@@ -758,14 +797,31 @@ class LayoutParser:
         return x_axis_var, y_axis_var
 
     @classmethod
-    def _get_rect(cls, rect_pattern: str, layout_content: str):
+    def _get_rect(cls, x_to_y_ratio_pattern: str, x1_pattern: str, y1_pattern: str, x2_pattern: str,
+                  y2_pattern: str, layout_content: str):
         logging.info('Get rectangle size')
-        match = re.search(rect_pattern, layout_content)
-        x_to_y_ratio = float(match.group(1))
-        x1 = float(match.group(2))
-        y1 = float(match.group(3))
-        x2 = float(match.group(4))
-        y2 = float(match.group(5))
+        match_x_to_y_ratio = re.search(x_to_y_ratio_pattern, layout_content)
+        match_x1 = re.search(x1_pattern, layout_content)
+        match_y1 = re.search(y1_pattern, layout_content)
+        match_x2 = re.search(x2_pattern, layout_content)
+        match_y2 = re.search(y2_pattern, layout_content)
+        x_to_y_ratio = float(match_x_to_y_ratio.group(1))
+        if match_x1 is None:
+            x1 = 13.
+        else:
+            x1 = float(match_x1.group(1))
+        if match_y1 is None:
+            y1 = 11.
+        else:
+            y1 = float(match_y1.group(1))
+        if match_x2 is None:
+            x2 = 88.
+        else:
+            x2 = float(match_x2.group(1))
+        if match_y2 is None:
+            y2 = 88.
+        else:
+            y2 = float(match_y2.group(1))
         rect = (x1, y1, x2, y2)
         return x_to_y_ratio, rect
 
@@ -799,7 +855,8 @@ class LayoutParser:
         self.layout_content = self._get_layout_content(self.layout_name)
         self.frame_width, self.frame_height = self._get_frame_size(self._frame_pattern, self.layout_content)
         self.x_axis_var, self.y_axis_var = self._get_axis_var_numbers(self._axis_var_pattern, self.layout_content)
-        self.x_to_y_ratio, self.rect = self._get_rect(self._rect_pattern, self.layout_content)
+        self.x_to_y_ratio, self.rect = self._get_rect(self.x_to_y_ratio_pattern, self.x1_pattern, self.y1_pattern,
+                                                      self.x2_pattern, self.y2_pattern, self.layout_content)
         self.xlim = self._get_xlim(self._xlim_pattern, self.layout_content)
         self.ylim = self._get_ylim(self._ylim_pattern, self.layout_content)
         logging.info('FINISH PARSING')
@@ -894,9 +951,9 @@ class ColormapSettings:
 class AxisSettings:
     def __init__(self, x_axis_var: int, y_axis_var: int, rect: tuple = (10, 10, 90, 90), x_line_pos: float=0,
                  y_line_pos: float=0, x_to_y_ratio=1, preserve_axis_length: bool = False,
-                 x_title_font: Font = Font(), x_label_font: Font = Font(), x_title_offset: float=5.,
-                 x_label_offset: float = 1., y_title_font: Font = Font(), y_label_font: Font = Font(),
-                 y_title_offset: float=5., y_label_offset: float = 1., **kwargs):
+                 x_title_font: Font = Font(), x_label_font: Font = Font(), x_title_offset: float=None,
+                 x_label_offset: float = None, y_title_font: Font = Font(), y_label_font: Font = Font(),
+                 y_title_offset: float=None, y_label_offset: float = None, **kwargs):
         """
         :param x_axis_var: int \n
             номер переменной, откладываемая по горизонтальной оси, например, x_axis_var = 0
@@ -966,10 +1023,10 @@ class ExportSettings:
 
 
 class TicksSettings:
-    def __init__(self, x_auto_grid: bool = True, x_major_thickness: float =0.5, x_major_length: float = 2,
-                 x_minor_thickness: float =0.12, x_minor_length: float = 1.2,
-                 y_auto_grid: bool = True, y_major_thickness: float =0.5, y_major_length: float = 2.,
-                 y_minor_thickness: float =0.12, y_minor_length: float = 1.2, **kwargs):
+    def __init__(self, x_auto_grid: bool = True, x_major_thickness: float = None, x_major_length: float = None,
+                 x_minor_thickness: float = None, x_minor_length: float = None,
+                 y_auto_grid: bool = True, y_major_thickness: float = None, y_major_length: float = None,
+                 y_minor_thickness: float = None, y_minor_length: float = None, **kwargs):
         """
         :param x_auto_grid: bool, optional \n
             Параметр регулирует автонастройку сетки на оси x
@@ -1007,8 +1064,8 @@ class TicksSettings:
         self.kwargs = kwargs
 
 
-def _get_create_picture_macro(axis_settings: AxisSettings, ticks_settings: TicksSettings,
-                              export_settings: ExportSettings, frame_settings: FrameSettings) -> str:
+def _get_create_picture_macro(axis_settings: AxisSettings, export_settings: ExportSettings,
+                              frame_settings: FrameSettings, ticks_settings: TicksSettings = TicksSettings()) -> str:
 
     extract_slice = _get_extract_slice_command()
     show_contour = _get_show_contour_command()
@@ -1019,12 +1076,14 @@ def _get_create_picture_macro(axis_settings: AxisSettings, ticks_settings: Ticks
                                                  axis_settings.x_title_offset, axis_settings.x_label_offset,
                                                  axis_settings.y_title_font, axis_settings.y_label_font,
                                                  axis_settings.y_title_offset, axis_settings.y_label_offset)
-    ticks_settings_macro = get_ticks_settings_macro(ticks_settings.x_auto_grid, ticks_settings.x_major_thickness,
-                                                    ticks_settings.x_major_length, ticks_settings.x_minor_thickness,
-                                                    ticks_settings.x_minor_length,
-                                                    ticks_settings.y_auto_grid, ticks_settings.y_major_thickness,
-                                                    ticks_settings.y_major_length, ticks_settings.y_minor_thickness,
-                                                    ticks_settings.y_minor_length, **ticks_settings.kwargs)
+    ticks_settings_macro = _get_ticks_settings_macro(ticks_settings.x_auto_grid, ticks_settings.x_major_thickness,
+                                                     ticks_settings.x_major_length,
+                                                     ticks_settings.x_minor_thickness,
+                                                     ticks_settings.x_minor_length,
+                                                     ticks_settings.y_auto_grid, ticks_settings.y_major_thickness,
+                                                     ticks_settings.y_major_length,
+                                                     ticks_settings.y_minor_thickness,
+                                                     ticks_settings.y_minor_length, **ticks_settings.kwargs)
     activate_zone = _get_activate_zones_command([export_settings.zone_number])
     frame_size = _get_frame_size_commands(frame_settings.width, frame_settings.height)
     export = _get_export_command(export_settings.exportfname, export_settings.imagewidth)
@@ -1038,8 +1097,8 @@ def _get_create_picture_macro(axis_settings: AxisSettings, ticks_settings: Ticks
 class PictureCreator:
     def __init__(self, source_file: str, macro_filename: str, slice_settings: SliceSettings,
                  level_settings: LevelSettings, legend_settings: LegendSettings, colormap_settings: ColormapSettings,
-                 axis_settings: AxisSettings, ticks_settings: TicksSettings, export_settings: ExportSettings,
-                 frame_settings: FrameSettings):
+                 axis_settings: AxisSettings, export_settings: ExportSettings,
+                 frame_settings: FrameSettings, ticks_settings: TicksSettings = TicksSettings()):
         """
         :param source_file: str \n
             Имя файла с расширением .plt или .lay, содержащий данные для визуализации
@@ -1082,8 +1141,8 @@ class PictureCreator:
                                             self.colormap_settings.colormap_name, **self.colormap_settings.kwargs)
 
     def _get_create_picture_macro(self):
-        return _get_create_picture_macro(self.axis_settings, self.ticks_settings, self.export_settings,
-                                         self.frame_settings)
+        return _get_create_picture_macro(self.axis_settings, self.export_settings,
+                                         self.frame_settings, self.ticks_settings,)
 
     def _get_legend_font_settings(self):
         return _get_legend_font_settings(self.legend_settings.header_font, self.legend_settings.number_font)
