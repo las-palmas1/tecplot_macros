@@ -642,11 +642,30 @@ def _get_activate_zones_command(zone_number_list: typing.List[int]) -> str:
     return result
 
 
-def _get_export_command(exportfname, imagewidth=1200) -> str:
-    result = "$!EXPORTSETUP EXPORTFNAME = '%s'\n" \
-             "$!EXPORTSETUP IMAGEWIDTH = %s\n" \
-             "$!EXPORT\n" \
-             "  EXPORTREGION = CURRENTFRAME\n" % (exportfname, imagewidth)
+def _get_export_command(exportfname, imagewidth=1200, **kwargs) -> str:
+    """
+    :param exportfname:  str \n
+        имя файла, в который будет осуществляться экспорт
+    :param imagewidth: int, optional \n
+        ширина картинки
+    :keyword quality: int, от 0 до 100 \n
+            Необходимо задавать, если изображение в формате JPEG
+    :return:
+    """
+    if 'quality' not in kwargs:
+        kwargs['quality'] = 100
+    ext = os.path.splitext(exportfname)[1]
+    if ext == '.png':
+        str1 = "$!EXPORTSETUP EXPORTFNAME = '%s'\n" % exportfname
+    elif ext == '.jpeg':
+        str1 = "$!EXPORTSETUP EXPORTFORMAT = JPEG\n" \
+               "$!EXPORTSETUP EXPORTFNAME = '%s'\n" \
+               "$!EXPORTSETUP QUALITY = %s\n" % (exportfname, kwargs['quality'])
+    else:
+        str1 = "$!EXPORTSETUP EXPORTFNAME = '%s'\n" % exportfname
+    result = str1 + "$!EXPORTSETUP IMAGEWIDTH = %s\n" \
+                    "$!EXPORT\n" \
+                    "  EXPORTREGION = CURRENTFRAME\n" % imagewidth
     return result
 
 
@@ -669,10 +688,11 @@ def _get_go_to_3d_command() -> str:
     return "$!PLOTTYPE = CARTESIAN3D\n"
 
 
-def _get_frame_size_commands(width: float = None, height: float = None):
+def _get_frame_size_commands(width: float = None, height: float = None, show_border: bool = False):
     template = "$!FRAMELAYOUT HEIGHT = %s\n" * (width is not None) + \
-               "$!FRAMELAYOUT WIDTH = %s\n" * (height is not None)
-    args = _filter_args_for_str_formatting((height, width))
+               "$!FRAMELAYOUT WIDTH = %s\n" * (height is not None) + \
+               "$!FRAMELAYOUT SHOWBORDER = %s\n"
+    args = _filter_args_for_str_formatting((height, width)) + tuple([show_border.__str__().upper()])
     result = template % args
     return result
 
@@ -865,15 +885,18 @@ class LayoutParser:
 
 
 class FrameSettings:
-    def __init__(self, width: float=None, height: float=None):
+    def __init__(self, width: float=None, height: float=None, show_border: bool = False):
         """
         :param width:  float, optional \n
             Ширина фрейма
         :param height: float, optional \n
             Высота фрейма
+        :param show_border: bool, optional \n
+            Параметр регулирующий наличие или отсутствие границы на изображении
         """
         self.width = width
         self.height = height
+        self.show_border = show_border
 
 
 class SliceSettings:
@@ -1009,7 +1032,7 @@ class AxisSettings:
 
 
 class ExportSettings:
-    def __init__(self, zone_number: int, exportfname: str, imagewidth=1200):
+    def __init__(self, zone_number: int, exportfname: str, imagewidth=1200, **kwargs):
         """
         :param zone_number: int \n
             номер зоны, в которую будут извлечены данные среза, (на единицу большего общего
@@ -1018,10 +1041,13 @@ class ExportSettings:
             имя файла, в который будет осуществляться экспорт
         :param imagewidth: int, optional \n
             ширина картинки
+        :keyword quality: int, от 0 до 100 \n
+            Необходимо задавать, если изображение в формате JPEG
         """
         self.zone_number = zone_number
         self.exportfname = exportfname
         self.imagewidth = imagewidth
+        self.kwargs = kwargs
 
 
 class TicksSettings:
@@ -1087,8 +1113,8 @@ def _get_create_picture_macro(axis_settings: AxisSettings, export_settings: Expo
                                                      ticks_settings.y_minor_thickness,
                                                      ticks_settings.y_minor_length, **ticks_settings.kwargs)
     activate_zone = _get_activate_zones_command([export_settings.zone_number])
-    frame_size = _get_frame_size_commands(frame_settings.width, frame_settings.height)
-    export = _get_export_command(export_settings.exportfname, export_settings.imagewidth)
+    frame_size = _get_frame_size_commands(frame_settings.width, frame_settings.height, frame_settings.show_border)
+    export = _get_export_command(export_settings.exportfname, export_settings.imagewidth, **export_settings.kwargs)
     delete_zone = _get_delete_zones_command([export_settings.zone_number])
     go_to_3d = _get_go_to_3d_command()
     result = (extract_slice + show_contour + go_to_2d + axis_font_settings + ticks_settings_macro + activate_zone +
