@@ -7,7 +7,7 @@ import numpy as np
 import logging
 import re
 
-__version__ = '0.3'
+__version__ = '0.4'
 __author__ = 'Alexander Zhigalkin'
 
 logging.basicConfig(level=logging.INFO, format='%(msg)s')
@@ -669,9 +669,11 @@ def _get_go_to_3d_command() -> str:
     return "$!PLOTTYPE = CARTESIAN3D\n"
 
 
-def _get_frame_size_commands(width: float, height: float):
-    result = "$!FRAMELAYOUT HEIGHT = %s\n" \
-             "$!FRAMELAYOUT WIDTH = %s\n" % (height, width)
+def _get_frame_size_commands(width: float = None, height: float = None):
+    template = "$!FRAMELAYOUT HEIGHT = %s\n" * (width is not None) + \
+               "$!FRAMELAYOUT WIDTH = %s\n" * (height is not None)
+    args = _filter_args_for_str_formatting((height, width))
+    result = template % args
     return result
 
 
@@ -863,7 +865,7 @@ class LayoutParser:
 
 
 class FrameSettings:
-    def __init__(self, width: float=9, height: float=8):
+    def __init__(self, width: float=None, height: float=None):
         """
         :param width:  float, optional \n
             Ширина фрейма
@@ -1098,7 +1100,7 @@ class PictureCreator:
     def __init__(self, source_file: str, macro_filename: str, slice_settings: SliceSettings,
                  level_settings: LevelSettings, legend_settings: LegendSettings, colormap_settings: ColormapSettings,
                  axis_settings: AxisSettings, export_settings: ExportSettings,
-                 frame_settings: FrameSettings, ticks_settings: TicksSettings = TicksSettings()):
+                 frame_settings: FrameSettings = FrameSettings(), ticks_settings: TicksSettings = TicksSettings()):
         """
         :param source_file: str \n
             Имя файла с расширением .plt или .lay, содержащий данные для визуализации
