@@ -704,7 +704,7 @@ class _LayoutParserDescriptor:
 
     def __get__(self, instance, owner):
         if self.value is None:
-            raise ValueError('%s was not writen from layout' % self.name)
+            raise ValueError('%s was not read from layout' % self.name)
         else:
             return self.value
 
@@ -803,22 +803,6 @@ class LayoutParser:
                              "\s*}\n?"
 
     @classmethod
-    def _get_frame_size(cls, frame_pattern: str, layout_content: str):
-        logging.info('Get frame size')
-        match = re.search(frame_pattern, layout_content)
-        frame_width = float(match.group(1))
-        frame_height = float(match.group(2))
-        return frame_width, frame_height
-
-    @classmethod
-    def _get_axis_var_numbers(cls, axis_var_pattern: str, layout_content: str):
-        logging.info('Get axis varnumbers')
-        match = re.search(axis_var_pattern, layout_content)
-        x_axis_var = int(match.group(1))
-        y_axis_var = int(match.group(2))
-        return x_axis_var, y_axis_var
-
-    @classmethod
     def _get_rect(cls, x_to_y_ratio_pattern: str, x1_pattern: str, y1_pattern: str, x2_pattern: str,
                   y2_pattern: str, layout_content: str):
         logging.info('Get rectangle size')
@@ -846,6 +830,22 @@ class LayoutParser:
             y2 = float(match_y2.group(1))
         rect = (x1, y1, x2, y2)
         return x_to_y_ratio, rect
+
+    @classmethod
+    def _get_frame_size(cls, frame_pattern: str, layout_content: str):
+        logging.info('Get frame size')
+        match = re.search(frame_pattern, layout_content)
+        frame_width = float(match.group(1))
+        frame_height = float(match.group(2))
+        return frame_width, frame_height
+
+    @classmethod
+    def _get_axis_var_numbers(cls, axis_var_pattern: str, layout_content: str):
+        logging.info('Get axis varnumbers')
+        match = re.search(axis_var_pattern, layout_content)
+        x_axis_var = int(match.group(1))
+        y_axis_var = int(match.group(2))
+        return x_axis_var, y_axis_var
 
     @classmethod
     def _get_xlim(cls, xlim_pattern: str, layout_content: str):
@@ -1227,6 +1227,29 @@ class PictureCreator:
         file = open(macro_filename, 'w')
         file.close()
 
+    @classmethod
+    def _get_last_source_filename(cls, macro_filename: str):
+        with open(macro_filename, 'r') as file:
+            macro = file.read()
+        plt_pattern = "\$!READDATASET\s+'(.+.plt)'.*\n"
+        lay_pattern = "\$!OPENLAYOUT\s+'(.+.lay)'.*\n"
+        cfx_pattern = "\$!READDATASET\s+'.+%s(.+.res)%s.+'.+\n" % ('"', '"')
+        split_pattern = "\$!PLOTTYPE = CARTESIAN3D\n"
+        if macro:
+            split_macro = re.split(split_pattern, macro)
+            fname_match_list = []
+            for i in reversed(split_macro[0: len(split_macro)]):
+                fname_match_list = [re.search(plt_pattern, i),
+                                    re.search(lay_pattern, i),
+                                    re.search(cfx_pattern, i)]
+                fname_match_list = list(filter(lambda x: x is not None, fname_match_list))
+                if len(fname_match_list) > 0:
+                    break
+            result = fname_match_list[0].group(1)
+        else:
+            result = ''
+        return result
+
     def add_to_existing_macro(self):
         """
         Добавляет команды в существующий макрос. Если файла с макросом не существует, создает пустой файл
@@ -1238,10 +1261,15 @@ class PictureCreator:
         self._check_macro_existence(self.macro_filename)
         if self._is_wrapped(self.macro_filename):
             self._clear_macro(self.macro_filename)
-        if os.path.splitext(self.source_file)[1] == '.plt':
-            open_file = get_open_data_file_command(self.source_file)
+
+        last_source_filename = self._get_last_source_filename(self.macro_filename)
+        if (not last_source_filename) or (last_source_filename and self.source_file != last_source_filename):
+            if os.path.splitext(self.source_file)[1] == '.plt':
+                open_file = get_open_data_file_command(self.source_file)
+            else:
+                open_file = get_open_layout_command(self.source_file)
         else:
-            open_file = get_open_layout_command(self.source_file)
+            open_file = '$!ACTIVEFIELDMAPS = [1-%s]\n' % (self.export_settings.zone_number - 1)
         slice_settings = self._get_slice_settings_macro()
         level_settings = self._get_level_settings_macro()
         legend_settings = self._get_legend_settings_macro()
