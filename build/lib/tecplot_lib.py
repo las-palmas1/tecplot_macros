@@ -71,7 +71,7 @@ def get_open_data_file_command(filename: str, loader_type: LoaderType = LoaderTy
         Тип загрузчика данных
     :return: str \n 
     """
-    result = "$!READDATASET  '%s'\n" % filename
+    result = "$!READDATASET  '%s%s%s'\n" % ('"', filename, '"')
     if loader_type == LoaderType.CFX:
         result = "$!READDATASET  '%s%s%s %s%s%s %s%s%s %s%s%s %s%s%s %s%s%s %s%s%s %s%s%s' " \
                  "DATASETREADER = 'ANSYS CFX (FEA)'\n" % ('"', 'StandardSyntax', '"', '"', '1.0', '"', '"',
@@ -81,20 +81,41 @@ def get_open_data_file_command(filename: str, loader_type: LoaderType = LoaderTy
     return result
 
 
-def get_write_data_set_command(filename: str) -> str:
+def get_write_data_set_command(filename: str, binary: bool=True, var_list: typing.List=None) -> str:
     """
     :param filename: str \n
         имя файла с расширением .plt, в который будут сохранены данные
+    :param binary: bool, optional \n
+        По умолчанию равен True. Определяет формат сохранения данных (бинарный или текстовый)
+    :param var_list: list, optional \n
+        Определяет, какие переменные будут записаны в файл
     :return: str \n
     """
-    result = "$!WRITEDATASET  '%s' \n" \
-             "  INCLUDETEXT = NO\n" \
-             "  INCLUDEGEOM = NO\n" \
-             "  INCLUDEDATASHARELINKAGE = YES\n" \
-             "  BINARY = YES\n" \
-             "  USEPOINTFORMAT = NO\n" \
-             "  PRECISION = 9\n" \
-             "  TECPLOTVERSIONTOWRITE = TECPLOTCURRENT\n" % (filename)
+    if var_list:
+        var_list_str = ''
+        for n, i in enumerate(var_list):
+            if n != (len(var_list) - 1):
+                var_list_str += '%s,' % i
+            else:
+                var_list_str += '%s' % i
+        result = "$!WRITEDATASET  '%s' \n" \
+                 "  INCLUDETEXT = NO\n" \
+                 "  INCLUDEGEOM = NO\n" \
+                 "  INCLUDEDATASHARELINKAGE = YES\n" \
+                 "  VARPOSITIONLIST =  [%s]\n" \
+                 "  BINARY = %s\n" \
+                 "  USEPOINTFORMAT = YES\n" \
+                 "  PRECISION = 9\n" \
+                 "  TECPLOTVERSIONTOWRITE = TECPLOTCURRENT\n" % (filename, var_list_str, binary.__str__().upper())
+    else:
+        result = "$!WRITEDATASET  '%s' \n" \
+                 "  INCLUDETEXT = NO\n" \
+                 "  INCLUDEGEOM = NO\n" \
+                 "  INCLUDEDATASHARELINKAGE = YES\n" \
+                 "  BINARY = %s\n" \
+                 "  USEPOINTFORMAT = YES\n" \
+                 "  PRECISION = 9\n" \
+                 "  TECPLOTVERSIONTOWRITE = TECPLOTCURRENT\n" % (filename, binary.__str__().upper())
     return result
 
 
@@ -124,7 +145,7 @@ def get_save_layout_command(filename: str) -> str:
     return result
 
 
-def _get_data_file_extraction_macro_body(filename, polylines: typing.List[PolyLine], output_dir) -> str:
+def _get_data_file_extraction_macro(filename, polylines: typing.List[PolyLine], output_dir) -> str:
     s1 = get_open_data_file_command(filename)
     s2 = ''
     output_filename_template = os.path.splitext(os.path.split(filename)[1])[0] + '_line_%s.dat'
@@ -180,8 +201,8 @@ class LineDataExtractor:
         macros_body = ''
         for n, filename in enumerate(data_filenames):
             if os.path.splitext(filename)[1] == '.plt':
-                macros_body += '%s' % _get_data_file_extraction_macro_body(os.path.join(self.datafiles_dir, filename),
-                                                                           self.polylines_list[n], self.output_dir)
+                macros_body += '%s' % _get_data_file_extraction_macro(os.path.join(self.datafiles_dir, filename),
+                                                                      self.polylines_list[n], self.output_dir)
         return wrap_macro(macros_body)
 
     def run_extraction(self):
@@ -190,20 +211,10 @@ class LineDataExtractor:
         execute_macro(self.macro_name)
 
 
-class LineDataLoader:
+class TextDataLoader:
     """
-    Позволяет считать извлеченные по полилиниям данные  из всех файлов, содержащихся в папке, путь к которой 
-    хранится в поле data_dirname, и записать данные из каждого файла в экземпляр класса Pandas.DataFrame, доступ к 
-    списку которых осуществляется через поле frames
+    Содержит методы для считывания данных, сохраненных в текстовом формате
     """
-    def __init__(self, data_dirname: str):
-        """
-        :param data_dirname: str \n
-            имя папки, содержащей файлы с извлеченными данными
-        """
-        self.data_dirname = data_dirname
-        self.frames: typing.List[pd.DataFrame] = []
-
     @classmethod
     def _split_str(cls, string: str) -> typing.List[str]:
         arr = string.split(sep=' ')
@@ -247,10 +258,30 @@ class LineDataLoader:
         return result
 
     @classmethod
+    def get_solution_time(cls, filename) -> float:
+        with open(filename, 'r') as file:
+            content = file.read()
+        pattern = 'SOLUTIONTIME=(\d+.\d+)\s*\n'
+        match = re.search(pattern, content)
+        if match:
+            result = float(match.group(1))
+        else:
+            result = None
+        return result
+
+    @classmethod
     def _get_variable_names(cls, str_list: typing.List[typing.List[str]]) -> typing.List[str]:
         result = []
+        str_list_copy = copy.deepcopy(str_list)
         for n, i in enumerate(str_list):
-            if n == 0:
+            if n == 0 and str_list[n][0] == 'VARIABLES':
+                break
+            elif str_list[n][0] != 'VARIABLES':
+                str_list_copy.pop(0)
+            elif str_list[n][0] == 'VARIABLES':
+                break
+        for n, i in enumerate(str_list_copy):
+            if i[0] == 'VARIABLES':
                 result.append(cls._get_sum_str_list(i, 2, with_spaces=True))
             elif i[0] != 'ZONE':
                 result.append(cls._get_sum_str_list(i, 0, with_spaces=True))
@@ -271,6 +302,30 @@ class LineDataLoader:
             except ValueError:
                 pass
         return result
+
+    @classmethod
+    def get_frame(cls, filename: str) -> pd.DataFrame:
+        logging.info('%s:   Loading file:   %s' % (TextDataLoader, filename))
+        str_list = cls._get_str_list_from_file(filename)
+        var_names = cls._get_variable_names(str_list)
+        var_arrays = cls._get_variable_arrays(str_list)
+        result = pd.DataFrame.from_records(var_arrays, columns=var_names)
+        return result
+
+
+class LineDataLoader(TextDataLoader):
+    """
+    Позволяет считать извлеченные по полилиниям данные  из всех файлов, содержащихся в папке, путь к которой 
+    хранится в поле data_dirname, и записать данные из каждого файла в экземпляр класса Pandas.DataFrame, доступ к 
+    списку которых осуществляется через поле frames
+    """
+    def __init__(self, data_dirname: str):
+        """
+        :param data_dirname: str \n
+            имя папки, содержащей файлы с извлеченными данными
+        """
+        self.data_dirname = data_dirname
+        self.frames: typing.List[pd.DataFrame] = []
 
     def load(self):
         files_list = os.listdir(self.data_dirname)
