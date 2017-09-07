@@ -7,7 +7,7 @@ import numpy as np
 import logging
 import re
 
-__version__ = '0.4'
+__version__ = '0.41'
 __author__ = 'Alexander Zhigalkin'
 
 logging.basicConfig(level=logging.INFO, format='%(msg)s')
@@ -81,7 +81,8 @@ def get_open_data_file_command(filename: str, loader_type: LoaderType = LoaderTy
     return result
 
 
-def get_write_data_set_command(filename: str, binary: bool=True, var_list: typing.List=None) -> str:
+def get_write_data_set_command(filename: str, binary: bool=True, var_list: typing.List[int]=None,
+                               zone_list: typing.List[int] = None) -> str:
     """
     :param filename: str \n
         имя файла с расширением .plt, в который будут сохранены данные
@@ -89,33 +90,39 @@ def get_write_data_set_command(filename: str, binary: bool=True, var_list: typin
         По умолчанию равен True. Определяет формат сохранения данных (бинарный или текстовый)
     :param var_list: list, optional \n
         Определяет, какие переменные будут записаны в файл
+    :param zone_list: list, optional \n
+        Определяет список экспортируемых в файл зон
     :return: str \n
     """
+    if zone_list:
+        zone_list_str = '  ZONELIST = ['
+        for n, i in enumerate(zone_list):
+            if n != (len(zone_list) - 1):
+                zone_list_str += '%s,' % i
+            else:
+                zone_list_str += '%s]\n' % i
+    else:
+        zone_list_str = ''
     if var_list:
-        var_list_str = ''
+        var_list_str = '  VARPOSITIONLIST =  ['
         for n, i in enumerate(var_list):
             if n != (len(var_list) - 1):
                 var_list_str += '%s,' % i
             else:
-                var_list_str += '%s' % i
-        result = "$!WRITEDATASET  '%s' \n" \
-                 "  INCLUDETEXT = NO\n" \
-                 "  INCLUDEGEOM = NO\n" \
-                 "  INCLUDEDATASHARELINKAGE = YES\n" \
-                 "  VARPOSITIONLIST =  [%s]\n" \
-                 "  BINARY = %s\n" \
-                 "  USEPOINTFORMAT = YES\n" \
-                 "  PRECISION = 9\n" \
-                 "  TECPLOTVERSIONTOWRITE = TECPLOTCURRENT\n" % (filename, var_list_str, binary.__str__().upper())
+                var_list_str += '%s]\n' % i
     else:
-        result = "$!WRITEDATASET  '%s' \n" \
-                 "  INCLUDETEXT = NO\n" \
-                 "  INCLUDEGEOM = NO\n" \
-                 "  INCLUDEDATASHARELINKAGE = YES\n" \
-                 "  BINARY = %s\n" \
-                 "  USEPOINTFORMAT = YES\n" \
-                 "  PRECISION = 9\n" \
-                 "  TECPLOTVERSIONTOWRITE = TECPLOTCURRENT\n" % (filename, binary.__str__().upper())
+        var_list_str = ''
+    result = "$!WRITEDATASET  '%s' \n" \
+             "  INCLUDETEXT = NO\n" \
+             "  INCLUDEGEOM = NO\n" \
+             "  INCLUDEDATASHARELINKAGE = YES\n" \
+             "%s" \
+             "%s" \
+             "  BINARY = %s\n" \
+             "  USEPOINTFORMAT = YES\n" \
+             "  PRECISION = 9\n" \
+             "  TECPLOTVERSIONTOWRITE = TECPLOTCURRENT\n" % (filename, zone_list_str,
+                                                             var_list_str, binary.__str__().upper())
     return result
 
 
