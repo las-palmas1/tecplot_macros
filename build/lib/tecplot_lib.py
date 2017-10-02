@@ -268,7 +268,7 @@ class TextDataLoader:
     def get_solution_time(cls, filename) -> float:
         with open(filename, 'r') as file:
             content = file.read()
-        pattern = 'SOLUTIONTIME=(\d+.\d+)\s*\n'
+        pattern = 'SOLUTIONTIME=(\d+.?\d*)\s*\n'
         match = re.search(pattern, content)
         if match:
             result = float(match.group(1))
